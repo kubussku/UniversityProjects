@@ -1,0 +1,75 @@
+---
+title: "SQL i Techniki Imputacji Danych"
+author: "Jakub Kur, Łukasz Szweda, Jula Bulińska"
+date: "15 08 2021"
+output: html_document
+---
+
+Baza danych : 
+**DO PRZETLUMACZENIA**
+"The Sakila sample database is a fictitious database designed to represent a DVD rental store. The tables of the database include film, film_category, actor, customer, rental, payment and inventory among others.
+The Sakila sample database is intended to provide a standard schema that can be used for examples in books, tutorials, articles, samples, and so forth.
+Detailed information about the database can be found on the MySQL website: <br/>
+[dev.mysql.com](https://dev.mysql.com/doc/sakila/en/")
+
+Sakila for SQLite is a part of the sakila-sample-database-ports project intended to provide ported versions of the original MySQL database for other database systems, including:
+
+Oracle
+SQL Server
+SQLIte
+Interbase/Firebird
+Microsoft Access
+Sakila for SQLite is a port of the Sakila example database available for MySQL, which was originally developed by Mike Hillyer of the MySQL AB documentation team.
+This project is designed to help database administrators to decide which database to use for development of new products
+The user can run the same SQL against different kind of databases and compare the performance
+**DO PRZETLUMACZENIA _KoNIEC**<br/>
+
+**dodaj zdjecie polaczen w bazie danych**<br/>
+<br/>
+**dodaj zdjecie polaczen w bazie danych _ KONIEC**<br/>
+```{r setup, include=FALSE}
+# Database file dir - 'F:/SQL_TID Projekt/sqlite-sakila.db'
+# Resources: 
+# https://db.rstudio.com/
+
+# Libs
+library(odbc)
+library(DBI)
+library("RSQLite")
+
+# Connect to database from file
+con <- dbConnect(RSQLite::SQLite(), 'F:/SQL_TID Projekt/sqlite-sakila.db')
+# List all tables
+dbListTables(con)
+# Print table head for each table in database
+for (i in (dbListTables(con))){
+  print.data.frame(head(dbReadTable(con, i)))
+}
+# Standardowe wysłanie query przez syntax SQL'a
+res <- dbSendQuery(con, "SELECT * FROM actor")
+dbFetch(res)
+# Zapytania sql przez funkcje opisane w pakiecie DBI
+dbReadTable(con, "actor") # %>% mozna uzywac pipe operatorów z r-a
+
+# Zapytania sql przez biblioteke dplyr, cześć bibliotek z tidyverse sluzacych do zarzadzania danymi w R
+library(dbplyr)
+library(dplyr)
+film = tbl(con, "film")
+film %>%
+  summarise(rental_rate = mean(rental_rate))
+# Imputacje danych na bazie pingwinów :)
+# https://www.r-bloggers.com/2021/01/generating-sql-with-dbplyr-and-sqlfluff/
+```
+**DODAJ OPIS WSZYSTKICH TABLIC , CZEGO ONE DOTYCZA**<br/>
+<br/>
+
+
+**STARTUJEMY Z TABLICA FILM, OPISUJEMY OD FILMÓW QUERUJEMY PRZEZ NIĄ**
+ Czego możemy się dowiedzieć??
+**burza mózgów**
+ 
+ 
+
+
+
+
