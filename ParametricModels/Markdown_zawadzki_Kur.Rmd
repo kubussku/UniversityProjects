@@ -1,0 +1,491 @@
+---
+title: Zastosowanie uogólnionych modeli liniowych w analizie zróżnicowania ryzyka
+  braku aktywności konta bankowego.
+author: "Piotr Zawadzki, Jakub Kur"
+date: "20 06 2021"
+output:
+  html_document: default
+---
+<style>
+body {
+text-align: justify}
+</style>
+
+
+#### ***Spis Tresci:*** <br/>
+Wstep<br/>
+1. Analiza wstepna zbioru danych [Zawadzki, Kur] <br/>
+2. Wybór zmiennych objaśniających do modelu [Zawadzki]<br/>
+3. Model Logitowy [Zawadzki]<br/>
+4. Model Probitowy [Kur]<br/>
+5. Ocena i Porównanie Modeli logit / probit [Kur, Zawadzki]<br/>
+Podsumowanie [Kur]<br/>
+Próby ulepszenia [Kur]<br/>
+
+#### ***Wstęp***<br/>
+Zbiór danych Bank Churn Data Model został pobrany ze strony [kaggle.com](https://www.kaggle.com/). Zestaw danych składa się z losowo dobranej populacji klientów banku wraz z informacjami dotyczącymi danych demograficznych oraz statusu aktywności konta bankowego.  <br/>
+W omawianym projekcie zbudowane zostały modele logitowy i probitowy, a także zostało przeprowadzone ich porównanie i interpretacja, wraz z oceną efektów interakcji między zmiennymi niezależnymi. Mimo, że informacje o zestawie danych wskazuja ze jest to zestaw, który ma pomóc zdeterminowac klientów narażonych na ryzyko odejscia z banku podjelismy decyzje, że spróbójemy zbadac go pod innym katem. Dlatego analizowane bylo ryzyko braku aktywności na koncie bankowym. <br/>
+
+#### ***Analiza wstepna zbioru danych:*** <br/> 
+Zbiór danych Bank Churn_Data_Model zawiera 10 000 obserwacji oraz 14 zmiennych: <br/>
+**RowNumber** – numer porządkowy klienta banku zbiorze danych Bank Churn_Data_Model (zmienna jakościowa przedstawiona na skali nominalnej); <br/>
+**CustomerId** – identyfikator klienta banku (zmienna jakościowa przedstawiona na skali nominalnej); <br/>
+**Surname** – nazwisko klienta banku (zmienna jakościowa przedstawiona na skali nominalnej); <br/>
+**CreditScore** – scoring kredytowy klientów banku w przedziale od 350 do 850 punktów (zmienna ilościowa przedstawiona na skali ilorazowej); <br/>
+**Geography** – kraje, z których pochodzą klienci banku (Francja, Hiszpania lub Niemcy) (zmienna jakościowa przedstawiona na skali nominalnej); <br/>
+**Gender** – zawiera płeć klienta banku (zmienna jakościowa dychotomiczna, przedstawiona na skali nominalnej); <br/>
+**Age** – wiek klienta, w przedziale od 18 do 92 lat (zmienna ilościowa przedstawiona na skali ilorazowej); <br/>
+**Tenure** – liczba lat które klient przynależy do banku (zmienna ilościowa przedstawiona na skali ilorazowej); <br/>
+**Balance** – saldo bankowe klienta, w zakresie €0 - €250 898 (zmienna ilościowa przedstawiona na skali ilorazowej); <br/>
+**NumOfProducts** – liczba produktów bankowych, w posiadaniu klienta, w zakresie od 1 do 4 (zmienna ilościowa przedstawiona na skali ilorazowej); <br/>
+**HasCrCard** – zmienna dychotomiczna, przyjmująca wartość 1 – dla klientów posiadających kartę kredytową oraz 0 dla klientów nieposiadających takiej karty (zmienna jakościowa przedstawiona na skali nominalnej);<br/>
+**IsActiveMember** – zmienna dychotomiczna, przyjmująca wartości 1 – dla klientów, korzystających z konta bankowego oraz 0 – dla klientów niekorzystających z takiego konta (zmienna jakościowa przedstawiona na skali nominalnej);<br/>
+**EstimatedSalary** – przybliżona pensja klientów banku w zakresie od €11,58 do €199 992,5 (zmienna ilościowa przedstawiona na skali ilorazowej);<br/>
+<br/>
+Dane nie zawierały żadnych braków ani oczywistych błędów w strukturze danych. Zmienne RowNumber, CustomerID oraz Surname nie będą rozważane w kontekście dalszej budowy modelu, jako że mają charakter czysto opisowy.
+Celem pracy jest zbadanie jakie czynniki wpływają na szansę posiadania nieaktywnego konta bankowego (IsActiveMember). Według bazy danych, która posłuży nam do budowy modelu, prawie połowa badanych klientów posiadała nieaktywne konto (4849 z 10000; 48,5%).<br/>
+
+#### ***Biblioteki:*** <br/>
+```{r message=FALSE, warning=FALSE}
+library("car") # funkcja vif()
+library("MASS") # funkcja rlm() regresja odporna
+library("lmtest") # testy diagnostyczne modeli lm
+library("pscl") #pseudo-R2 funkcja pR2()
+library("pROC") #funkcje roc, auc
+library(summarytools) #summary tools
+library("snpar")
+library(papeR) # summary stats - lepszy wyglad tablicy
+library(kableExtra) #table formatting
+library(tidyverse) #data wrangling
+library(ggplot2)
+```
+#### ***Zaladowanie zestawu danych:*** <br/>
+```{r}
+setwd("F:/ug ekonometria mgr/II/modele nieparametryczne/projekt")
+dane1 <- read.table("Churn-Modeling4.csv", header = TRUE, sep = ",", dec = ".")
+```
+#### ***Ustawienie zmiennych jakosciowych w zestawie:*** <br/>
+```{r}
+dane1$Gender <- as.factor(dane1$Gender)
+dane1$HasCrCard <- as.factor(dane1$HasCrCard)
+dane1$IsActiveMember <- as.factor(dane1$IsActiveMember)
+dane1$Geography <- as.factor(dane1$Geography)
+levels(dane1$Gender) = c("Female","Male")
+levels(dane1$Geography) = c("France","Germany","Spain")
+```
+#### ***Zmienne jakosciowe:*** <br/>
+```{r echo=FALSE}
+data.frame(freq(dane1$Geography)[,1:4]) %>%
+  kbl(caption = "Tablica 1 - Liczebność klientów banku według kraju pochodzenia") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Na podstawie tabeli oraz wykresu widać, że większość klientów w bazie stanowią Francuzi, natomiast Niemcy oraz Hiszpanie stanowią po około 25% klientów z bazy.
+<br/>
+```{r echo=FALSE}
+data.frame(freq(dane1$Gender)[,1:4]) %>%
+  kbl(caption = "Tablica 2 - Liczebność klientów banku według płci") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Według informacji zawartych w Tabeli 2, mężczyźni stanowią 54,6% klientów z bazy danych, natomiast kobiety 45,4%.
+<br/>
+```{r echo=FALSE}
+data.frame(freq(dane1$HasCrCard)[,1:4]) %>%
+  kbl(caption = "Tablica 3 - Liczba klientów nieposiadających oraz posiadających kartę kredytową (1 - posiada, 0 - nie posiada)") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Większość klientów z bazy posiada kartę kredytową, ponieważ stanowią oni ponad 70% całkowitej liczebności próby.<br/>
+
+#### ***Zmienne ilosciowe:***
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+descr(dane1)[1:7,1:6] %>%
+kbl(caption = "Tablica 4 - Podstawowe statystki dla zmiennych ilościowych") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+
+```
+<br/>
+Jak widać zmienna Balance nie będzie stanowić dobrej zmiennej dla modelu, ponieważ jej odchylenie standardowe nie różni się znacznie od jej średniej. W bazie na tym etapie zastosowaliśmy już nową zmienną AgeNew, gdzie od wieku odjęliśmy najniższy posiadaczy konta, czyli 18 lat. Średni wiek klientów w bazie to więc około 39 lat. Średnia punktacja kredytowa to natomiast 650 i nie różni się zbytnio od mediany, która wynosi 652.
+<br/>
+```{r,fig.align='center'}
+ggplot(dane1, aes(x=CreditScoreNew)) + 
+    geom_histogram(aes(y=..density..),     
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="blue") + theme_classic()+ ylab("Gestosc")
+```
+<br/>
+Widzimy, że wielu klientów posiada maksymalną punktację kredytową w danym banku, natomiast oprócz punktacji równej 850, rozkład zmiennej przypomina rozkład normalny.
+<br
+
+#### ***Wybor zmiennych do modelu:*** <br/>
+Przy budowaniu uogólnionych modeli liniowych, spełnione powinny być następujące założenia:<br/>
+1) obserwacje są niezależne;<br/>
+2) wartości zmiennych niezależnych są ustalone (nie są losowe), a zmienna zależna jest losową tylko wyłącznie z powodu występowania składnika losowego;<br/>
+3) zmienne objaśniające nie są ze sobą skorelowane.<br/>
+Żeby zbadać współzależność cech, powinnyśmy zbudować macierz korelacji. Współczynniki korelacji liniowej Pearsona możemy używać tylko w stosunku do zmiennych ilościowych.
+```{r}
+round(cor(dane1[,c("CreditScoreNew","AgeNew","Tenure","Balance","NumOfProductsNew","EstimatedSalary")]),3) %>%
+  kbl(caption = "Tablica 5 - Macierz korelacji liniowej Pearsona dla zmiennych ilościowych") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Utworzona została macierz korelacji liniowej Pearsona (Tablica 5) dla zmiennych ilościowych. Zmienne objaśniające nie są nadmiernie skorelowane (|r|≥0,7). <br/>
+Statystycznie istotne współczynniki korelacji liniowej: <br/>
+Balance - NumOfProductsNew <br/>
+<br/>
+Utworzono model logitowy ze wszystkimi zmiennymi. Gdzie zmienna Objasniana to **IsActiveMember** . <br/>
+```{r}
+#Model logitowy
+logit0 <- glm(IsActiveMember ~., data=dane1, family=binomial)
+#wskaĹşnik wariancji inflacyjnej
+data.frame(vif(logit0)) %>%
+  kbl(caption = "Tablica 6 - Wskaźnik rozdęcia wariancji, miara współliniowości zmiennych objaśniających") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Jak widać na podstawie Tabeli 6 wartości wszystkich czynników są bliskie jedności, co oznacza, że nie są współliniowe. Wartością graniczną przyjmowaną w przypadku modeli GLM jest 2,5.<br/>
+<br/>
+<br/>
+W celu znalezienia współzależności między cechami ilościowymi oraz jakościowymi przeprowadzony został test serii Walda – Wolfowitza:<br/>
+H0: rozkład cechy w podgrupach jest jednakowy<br/>
+H1: rozkład cechy w podgrupach się różni – cecha jest współzależna z cechą grupującą<br/>
+<br/>
+
+<font size="2">Tablica 7 - Test serii Walda-Wolfowitza względem zmiennej grupującej **Gender**</font>
+<center>![Tablica_7](Tablice png/Tablica_7.png)</center/>
+<font size="1">Źródło: opracowanie własne za pomocą programu Statistica</font><br/>
+<br/>
+Dla zmiennej grupującej Gender w Tablicy 7, żadna wartość p-value nie spadła poniżej 0,05, a więc brak podstaw do odrzucenia hipotezy zerowej. Płeć nie różnicuje rozkładu zmiennych ilościowych – ich rozkład jest taki sam dla kobiet oraz mężczyzn.<br/>
+<br/>
+<font size="2">Tablica 8 - Test serii Walda-Wolfowitza względem zmiennej grupującej **HasCrCard**</font>
+<center>![Tablica_8](Tablice png/Tablica_8.png)</center/>
+<font size="1">Źródło: opracowanie własne za pomocą programu Statistica</font><br/>
+<br/>
+Tablica 8 przedstawia wyniki testu serii Walda – Wolfowitza względem zmiennej grupującej HasCrCard. Grupa 1 są to klienci posiadający kartę kredytową, zaś grupa 2 – klienci bez karty. Niskie p-value możemy zaobserwować dla zmiennej NumOfProducts. Należałoby więc wyeliminować z modelu tę zmienną bądź też HasCrCard.
+<br/>
+Dla zmiennej grupującej Geography zostały wykonane trzy testy, aby uwzględnić każdy z trzech wariantów pochodzenia: Hiszpanię, Francję i Niemcy. W tablicach poniżej przedstawione zostały wyniki testów. 
+<br/>
+
+<font size="2">Tablica 9 - Test serii Walda-Wolfowitza względem zmiennej grupującej **Geography - France**</font><br/>
+<center>![Tablica_9](Tablice png/Tablica_9.png)</center/>
+<font size="1">Źródło: opracowanie własne za pomocą programu Statistica</font><br/> 
+<br/>
+Odrzucamy hipotezę zerową na korzyść hipotezy alternatywnej – rozkład Balance oraz NumOfProductsNew jest współzależny ze zmienną grupującą Geography. 
+<br/>
+
+<font size="2">Tablica 10 - Test serii Walda-Wolfowitza względem zmiennej grupującej **Geography - Germany**</font><br/>
+<center>![Tablica_10](Tablice png/Tablica_10.png)</center/>
+<font size="1">Źródło: opracowanie własne za pomocą programu Statistica</font><br/>
+<br/>
+Odrzucamy hipotezę zerową na korzyść hipotezy alternatywnej – Balance jest współzależny ze zmienną grupującą Geography. 
+<br/>
+
+<font size="2">Tablica 11 - Test serii Walda-Wolfowitza względem zmiennej grupującej **Geography - Spain**</font><br/>
+<center>![Tablica_11](Tablice png/Tablica_11.png)</center/>
+<font size="1">Źródło: opracowanie własne za pomocą programu Statistica</font><br/>
+<br/>
+Również tutaj, wartość p-value sugeruje odrzucenie hipotezy zerowej, Balance jest współzależny ze zmienną grupującą Geography. Biorąc pod uwagę Tabele 9-11, z modelu powinny zostać odrzucone zmienne Geography, bądź Balance i NumOfProducts.
+<br/>
+<br/>
+Za pomocą histogramów przeprowadzona została analiza rozkładów cech. Zostały zestawione ze sobą rozkłady zmiennej w zależności od tego, czy klient posiadał konto aktywne czy nieaktywne.
+<br/>
+<font size="2">Wykres 3-11 - Rozklad wzgledem zmiennej zaleznej</font><br/>
+<br/>
+
+<center>![Hist_1](Tablice png/Hist_1.png)
+![Hist_2](Tablice png/Hist_2.png)
+![Hist_3](Tablice png/Hist_3.png)
+![Hist_4](Tablice png/Hist_4.png)
+![Hist_5](Tablice png/Hist_5.png)
+![Hist_6](Tablice png/Hist_6.png)
+![Hist_7](Tablice png/Hist_7.png)
+![Hist_8](Tablice png/Hist_8.png)
+![Hist_9](Tablice png/Hist_9.png)</center/>
+<font size="1">Źródło: opracowanie własne za pomocą programu Statistica</font><br/>
+<br/>
+W zaprezentowanych powyżej wykresach 3, 4, 6, 8, 9 oraz 10, rozkład zmiennej nie różni się w zależności od tego czy dany klient posiadał aktywne czy nieaktywne konto. Nie ma więc potrzeby dalszej analizy tych zmiennych oraz umieszczania ich w modelu.<br/>
+Na podstawie Wykresu 5 dla zmiennej Tenure możemy wysnuć wniosek, że większe szanse na posiadanie aktywnego konta bankowego mają klienci w pierwszych latach od jego założenia. Wykres 7 natomiast ukazuje, że to mężczyźni częściej pozostają jako aktywni użytkownicy konta niż kobiety. Rozkład zmiennej Age ukazany na Wykresie 11 pokazuje, że to osoby starsze mają większe szanse na posiadanie aktywnego konta bankowego. Klienci powyżej 60 roku życia (40+18) częściej posiadają aktywne niż nieaktywne konto.
+<br/>
+W Tablicy 12, przedstawione zostały wyniki współczynnika V-Cramera, który daje możliwość obliczenia zależności również między zmiennymi jakościowymi. Z obliczeń zostały wyłączone zmienne ilościowe ciągłe – Balance oraz EstimatedSalary
+<br/>
+```{r}
+
+library(rcompanion)
+data.frame(`Nazwa Zmiennej` = c("CreditScoreNew","Geography","Gender","AgeNew","Tenure","NumOfProductsNew","HasCrCard"),
+           `Wsp. V-Cramer` = c(cramerV(dane1$IsActiveMember, dane1$CreditScoreNew),
+                               cramerV(dane1$IsActiveMember, dane1$Geography),
+                               cramerV(dane1$IsActiveMember, dane1$Gender),
+                               cramerV(dane1$IsActiveMember, dane1$AgeNew),
+                               cramerV(dane1$IsActiveMember, dane1$Tenure),
+                               cramerV(dane1$IsActiveMember, dane1$NumOfProductsNew),
+                               cramerV(dane1$IsActiveMember, dane1$HasCrCard))) %>%
+    kbl(caption = "Tablica 12 - Wartości współczynnika V-Cramera względem zmiennej zależnej IsActiveMember") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Jako że oczekujemy jak najwyższej wartości – sugerując się współczynnikiem V-Cramera typowalibyśmy do odrzucenia zmienne HasCrCard, Geography oraz Gender.
+<br/>
+W ostatnim kroku postanowiliśmy zbudować model ze wszystkimi zmiennymi objaśniającymi. 
+```{r}
+data.frame(summary(logit0)$coefficients) %>%
+  kbl(caption = "Tablica 13 - Wartości parametrów modelu logitowego dla wszystkich zmiennych objaśniających") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Sugerując się zbudowanym modelem, możemy uznać, że istotnymi są zmienne CreditScore, Gender, Age oraz Tenure. Biorąc od uwagę to oraz wszystkie powyższe rozważania, zdecydowaliśmy się wybrać do dalszej budowy modelu właśnie te zmienne.
+<br>
+
+#### ***Model Logitowy:*** <br/>
+
+Modelujemy prawdopodobieństwo posiadania przez klienta aktywnego konta – IsActiveMember = 1. Na potrzeby prawidłowej interpretacji modelu, utworzyliśmy wczesniej zmienne NewAge (wiek klienta, pomniejszony o 18 lat) oraz CreditScoreNew (liczba puntków, pomniejszona o 350). Sposób kodowania jakościowych zmiennych objaśniających – parametryzacja z poziomem odniesienia. Grupa referencyjna – osiemnastoletnie kobiety, z punktacją kredytową równą 350 i nowo otwartym kontem bankowym. W tablicy 14 zaprezentowaliśmy model, oszacowany metodą największej wiarygodności. 
+<br/>
+
+```{r}
+#Model logitowy 2
+logit1 <- glm(IsActiveMember ~CreditScoreNew + Gender + AgeNew + Tenure, data=dane1, family=binomial)
+data.frame(summary(logit1)$coefficients) %>%
+  kbl(caption = "Tablica 14 - Wartości parametrów modelu logitowego dla wybranych zmiennych") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Postać modelu logitowego wygląda następująco:<br/>
+<br/>
+`ln⁡(β ̂/(1-β ̂ ))=-0.4010+0.0005CreditScoreNew+0.1031Gender+0.0167AgeNew-0.0195Tenure`
+<br/>
+`Gender {0 - klientką jest kobieta        1 - klientem jest mężczyzna}`
+<br/>
+```{r}
+exp(logit1$coefficients)%>%
+  kbl(caption = "Tablica 15 - Ilorazy szans dla zmiennych objaśniających oraz wyrazu wolnego") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+exp(logit1$coefficients*10)%>%
+  kbl(caption = "Tablica 16 - Ilorazy szans dla zmiennych objaśniających oraz wyrazu wolnego(*10)") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+Kierując się wartościami ukazanymi w Tabeli 15, parametry oszacowanego modelu logitowego możemy interpretować w następujący sposób:<br/>
+Szansa na pozostanie aktywnym użytkownikiem banku w grupie referencyjnej, czyli osiemnastoletnich kobiet z punktacją kredytową równą 350 i nowo otwartym kontem bankowym wynosi 0.663.<br/>	
+Jeżeli klientowi banku poprawi się zdolność kredytowa o 100 punktów to wtedy będzie mieć 5.6% większą szansę na posiadanie aktywnego konta bankowego, ceteris paribus.<br/>		
+Mężczyzna ma 10.85% większą szansę na posiadanie aktywnego konta bankowego niż kobieta, ceteris paribus.<br/>
+O 10 lat starszy klient banku ma 18.13% większą szansę na posiadanie aktywnego konta bankowego, ceteris paribus.<br/>		
+Z każdym rokiem posiadania konta bankowego szansa jego aktywności spada o 1.92%, ceteris paribus.<br/>
+<br/>
+
+#### ***Model probitowy:*** <br/>
+
+Modele probitowe są modelami, które równie często stosowane są jak modele probitowe. Ich funkcja wiążaca probit ("mat. liczba charakteryzująca prawdopodobieństwo danego zdarzenia" [PWN]). Podobnie jak logit. p. wyraza prawdopodobienstwo w skali majacej dowolne wartosci rzeczywiste. Modele te wyrazaja prawdopodobienstwo zdarzenia jako funkcje czynników ilosciowych i jakosciowych wplywajacych na przebieg tego zdarzenia. W modelu tym nie mozna przedstawic zaleznosci pomiedzy pi ,a xiB w postaci wygodnego wyrazenia analitycznego jak ma to miejsce w modelu logitowym. <br/>
+```{r}
+
+#Model probitowy grupa referencyjna - Gender - Male
+dane2 <- dane1
+#dane2$Geography <- relevel(dane2$Geography, ref = "Germany")
+#dane2$Gender <- relevel(dane2$Gender, ref = "Male")
+probit0 <- glm(IsActiveMember ~CreditScoreNew + Gender + AgeNew + Tenure,
+              data=dane2, family=binomial(link = probit))
+summary(probit0)$coefficients%>%
+  kbl(caption = "Tablica 17 - Wartości parametrów modelu probitowego dla wybranych zmiennych") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Powyzej oszacowano parametry modelu probitowego na podstawie takich samych zalozen jak dla modelu logitowego. Parametry modelu probitowego maja takie same znaki (kierunki) jak w przypadku modelu logitowego. Znak ten (stojacy przy zmiennej Xi), określa kierunek wpływu zmiennej objaśniającej na zmienną objaśnianą. W wyestymowanym modelu można opisać CreditScoreNew, Gender, AgeNew, Tenure jako stymulanty a Tenure jako destymulantę.
+<br/>
+```{r}
+df_compare = data.frame(Logitowy = data.frame(summary(logit1)$coefficients)[1],
+           Probitowy = data.frame(summary(probit0)$coefficients)[1],
+           Probitowy1.6 = data.frame(summary(probit0)$coefficients)[1]*1.6,
+           Roznica =data.frame(summary(logit1)$coefficients)[1] - (data.frame(summary(probit0)$coefficients)[1]*1.6))
+colnames(df_compare) = c("Logitowy","Probitowy","Probitowy1.6","Roznica")
+df_compare%>%
+  kbl(caption = "Tablica 18 - Porównanie róznicy parametrów logit = 1.6*probit") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Zauważalne jest, że oba modele są do siebie podobne. Jest tak ponieważ dystrybuanty rozkładów listycznego i normalnego są podobne.  W literaturze doszukać się można równań, które pozwalają na przekształcenie parametrów modelu logitowego na model probitowy. Mówi ono że B_logit będzie zbliżone do 1.6* B_probit. Udowodniono to w poniżej Tablicy wyliczając tę różnice dla wszystkich parametrów omawianego modelu.
+<br/>
+
+### ***Ocena porównanie zaproponowanych modeli.*** <br/>
+
+#### ***Miary dopasowania - AIC , Pseudo R^2:*** <br/>
+Istnieje wiele wariantów miar dopasowania pseudo-R^2, z których każda jest odpowiednikiem R^2 dla modeli regresji liniowej. W praktyce wartości R^2 są niewielkie oraz raczej bliższe zeru niż jedności. Poniżej przedstawiamy dwie miary pseudo R^2 opartych na funkcji wiarygodności, obliczonych dla omawianego modelu:<br/>
+<br/>
+`R^2 McFaddena=1-  (lnL_k)/(lnL_0 )- indeks ilorazu wiarygnodności`
+<br/>
+`R^2 Cragga-Uhlera=  (1-(L_0/L_k )^(2/n))/(1-(L_0 )^(2/n) ) (współczynnik Nagelkerke'a):`
+<br/>
+`AIC = 2k-2ln(L(hat)`
+<br/>
+```{r}
+ocena_modelu_dwum <- function(model) {
+  kryterium_AIC <- c(model$aic)
+  McFadden<-pR2(model)[4]
+  Cragg_Uhler<-pR2(model)[6]
+  ocena <- data.frame(kryterium_AIC, McFadden, Cragg_Uhler)
+  return(ocena)
+}
+#Ocena modelu, AIC, Pseudo R^2
+wyniki_oceny_modeli_logit_probit = rbind(Logit = ocena_modelu_dwum(logit1),
+                                         Probit = ocena_modelu_dwum(probit0))
+wyniki_oceny_modeli_logit_probit %>%  
+  kbl(caption = "Tablica 19 - Kryterium AIC i Oceny pseudo R^2") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Rozpatrujac zaproponowane modele wedlug omawianych wyżej kryteriów można dostrzec, że w przypadku obu modeli wartosci sa zblizone. Model probitowy chrakteryzuje sie lepszym kryterium AIC. Również  przypadku ocen miar Pseudo R^2 jego wyniki sa lepsze. Należy jednak zauważyc że otrzymane wartości wybranych miar R2 są niskie, co jest typowe dla modeli dwumianowych.
+<br/>
+
+#### ***Tablica trafnosci i miary predykcji:*** <br/>
+Innym sposobem na zbadanie jakości dopasowania modelu do danych jest sprawdzenie, jaka jest trafność prognozowania na podstawie modelu. Prognoza opiera się na oszacowanym prawdopodobieństwie 𝑝̂𝑖, które jest funkcją 𝐹(𝑥𝑖𝛽̂). Ze względu na przyjęty punkt odcięcia, zgodnie z którym prognoza modelu przyjmuje wartości 0 lub 1, generuje się tablice trafności, zestawiająca prognozy modelu z obserwacjami rzeczywistymi. Wygenerowane zostaly tablice dla obu proponowanych modeli. <br/>
+```{r}
+#Tablica trafnosci p* = 0.5
+tab_traf <- data.frame(obserwowane=dane2$IsActiveMember, przewidywane=ifelse(logit1$fitted.values>0.5, 1, 0))
+tab_traf1 <- data.frame(obserwowane=dane2$IsActiveMember, przewidywane=ifelse(probit0$fitted.values>0.5, 1, 0))
+data.frame(table(tab_traf))%>%  
+  kbl(caption = "Tablica 20 - Tab. Trafnosci logit p=0,5") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+data.frame(table(tab_traf1))%>%  
+  kbl(caption = "Tablica 21 - Tab. trafności probit p=0,5") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Na podstawie tablicy trafnosci można obliczyc miary trafnosci prognoz, sa to:<br/>
+1. Zliczeniowy R2 (Accuracy)  R_Z^2 - (True Positive + True Negative) / N<br/>
+2. Wskaźnik błędu (ER-Error Rate)  ER - (False Positive + False Negative) / N<br/>
+3. Czułość (Sensitivity)  SENS - TP / (TP +FP)<br/>
+4. Swoistość (Specifity)SPEC  - TN/ (TN + FN)<br/>
+5. Dodatnia zdolność predykcyjna (Positive Predictive Value)  PPV - TP / (TP + FP)<br/>
+6. Ujemna zdolność predykcyjna (Negative Predictive Value)  NPV - TN / (TN + FN)<br/>
+Wyniki dla obu modeli zestawiono w tablicy 22.<br/>
+<br/>
+```{r}
+#Miary predykcji (tablica trafnoĹ›ci)
+miary_pred <- function(model, Y, p=0.5) {
+  tab <- table(obserwowane=Y, przewidywane=ifelse(model$fitted.values>p, 1, 0))
+  ACC <- (tab[1,1]+tab[2,2])/sum(tab)
+  ER <- (tab[1,2]+tab[2,1])/sum(tab)
+  SENS <- tab[2,2]/(tab[2,2]+tab[2,1])
+  SPEC <- tab[1,1]/(tab[1,1]+tab[1,2])
+  PPV <- tab[2,2]/(tab[2,2]+tab[1,2])
+  NPV <- tab[1,1]/(tab[1,1]+tab[2,1])
+  miary <- data.frame(ACC, ER, SENS, SPEC, PPV, NPV)
+  return(miary)
+}
+wyniki_miary_pred <- rbind(Logitowy =miary_pred(model=logit1, Y=dane2$IsActiveMember, p=0.5),
+                           Probitowy=miary_pred(model=probit0, Y=dane2$IsActiveMember, p=0.5))
+t(wyniki_miary_pred) %>%  
+  kbl(caption = "Tablica 22 - Miary predykcji na podstawie tablicy trafnosci dla modeli: logit, probit") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+Tablice trafności wygenerowana została stworzona z domyślnym progiem o wartości 0,5. Jeśli jednak zmienić wartość progu 0,5 na inną równą c (cut-off point), wówczas zmieni się tablica trafności, a wraz z nią procent błędów. Warto stosować inną niż 0,5 wartość progu c, gdy próba jest niezbilansowana, to znaczy procent obserwacji, dla których Y=1, jest znacznie wyższy/niższy niż 50%. Poziom c19 można ustalić na poziomie faktycznego odsetka obserwacji w próbie, dla których Y=1 (jednak w przypadku naszej bazy, byłaby to wartość zbliżona to wielkości domyślnej). Jest to tak zwana optymalna wartość graniczna Cramera.<br/>
+<br/>
+Biorac pod uwage uzyskane wyniki można stwierdzic, że oba modele radza sobie raczej srednio z zalozonym zadaniem. Procent trafien osiaga wartosci zblizone do 52%. Bledy dla obu modeli wynasza ok 48%.
+Czulosc modeli jest na poziomie 61.4% i 61.3% (Zdolnosc do rozpoznania tam gdzie wystepuje zjawisko), Swoistosc - 41,91% i 41,93% (Zdolnosc do rozpoznawania tam gdzie nie wystepuje zjawisko).  PPV - zdolnosc dodatnia predykcji i NPV - negatywna zdolnosc predykcji sa zblizone do 52.9% i 50,5% w obu przypadkach. Wartosci te wskazuja na jak mozna byc pewnym pozytywnego i negatywnego wyniku przeprowadzonej predykcji. <br/>
+
+#### ***Krzywa ROC _ AUC:*** <br/>
+Innym sposobem ustalenia progu c jest minimalizacja liczby błędów klasyfikacji. Jej określenie znacznie ułatwia krzywa ROC (Receiver Operating Characteristic), która pokazuje wszystkie kombinacje obu rodzajów błędów dla różnych wartości punktu odcięcia. Dla naszego modelu została ona ukazana na wykresie poniżej. <br/>
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#Funkcja
+rocplot = function(rocobj,modeltype){
+  ggroc(rocobj, legacy.axes = TRUE)+
+    ggtitle(paste("Krzywa ROC", modeltype)) +
+    geom_segment(aes(x = 0, xend = 1, y = 0, yend = 1), color="red")+
+    geom_hline(aes(yintercept=1), lty=2, color="grey")+
+    geom_hline(aes(yintercept=0), lty=2, color="grey")+
+    geom_vline(aes(xintercept=1), lty=2, color="grey")+
+    geom_vline(aes(xintercept=0), lty=2, color="grey")+
+    theme_classic()
+}
+```
+
+```{r message=FALSE, warning=FALSE}
+rocplot(roc(dane2$IsActiveMember, logit1$fitted.values)," - logit")
+```
+<br/>
+Krzywa ROC służy również jako podstawa kolejnej miary dopasowania modelu do danych – pole powierzchni pod krzywą ROC (AUC – Area under ROC). Jej wartość przyjmuje znaczenia od 0,5, gdy model nie ma żadnej mocy predykcyjnej, do 1 – wtedy model jest idealny. Dla modelu logitowego: `AUC = 0.5381382,  wskaźnik Gini’go 𝐺 = 2 ∗ 𝐴𝑈𝐶 − 1 = 0.0762764`
+<br/>
+
+```{r message=FALSE, warning=FALSE}
+rocplot(roc(dane2$IsActiveMember, probit0$fitted.values)," - probit")
+```
+<br/>Dla modelu logitowego: `AUC = 0.5380298,  wskaźnik Gini’go 𝐺 = 2 ∗ 𝐴𝑈𝐶 − 1 = 0.0760596`<br/>
+
+
+```{r message=FALSE, warning=FALSE}
+pole_AUC_logit<-as.numeric(auc(dane2$IsActiveMember, logit1$fitted.values))
+pole_AUC_probit<-as.numeric(auc(dane2$IsActiveMember, probit0$fitted.values))
+data.frame(row.names = c("Logit","Probit"),Pole_AUC = rbind(pole_AUC_logit, pole_AUC_probit)) %>%  
+  kbl(caption = "Tablica 22 - AUC") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>
+Badajac ten sposób efektywnosci modelu lepiej radzi sobie ponownie logitowy.
+<br/>
+
+#### ***Podsumowanie***
+  Mimo tego, że modele logitowe oraz probitowe sa dobre do objasniania zmiennych jakosciowych, a zwłaszcza do modelowania znajdowania jednostki w pewnym stanie. Niestety próbe zbudowania modelu z dostepnych danych, który bylby zdolny do dobrej identyfikacji klientóww potencjalnie narażonych na przejscie w status nieaktywnego. Musimy okreslic jako nieudana. Dostepne dane o klientach nie pozwolily na uzyskanie wyniku, który bylby satysfakcjonujaco wyższy i przy wysokiej ilosci prób wnosilby biznesowa wartosc. I dzieki któremu, można by aktywizowac uzytkownikow kont na różne sposoby (np. indywidualne kampanie marketingowo-promocyjne). Sam model radzi sobie niewiele lepiej od osoby która podejmowala by decyzje o zaklasyfikowaniu danej osoby do kampanii na podstawie rzutu moneta. Dlatego gdyby sytuacja miala miejsce w rzeczywistosci biznesowej rekomendowalibysmy nie wprowadzanie omawianego modelu do uzytku. A sam proces skierowalibysmy na ponowny etap badania zjawiska i identyfikacji wplywu roznych czynnikow na wlasnie ta zmienna. Wynik ten nie jest zaskoczeniem. Sam model nie piorunuje swoja skutecznoscia i utwierdza w przekonaniu, że *najważniejszym etapem w calym procesie budowania jakiegokolwiek modelu czy analizy jest prawidlowy dobór i budowa zmiennych samego zestawu zmiennych, ponieważ to na nim oparieraja sie wszystkie zastosowane pózniej równania i metody statystyczne*. . Z informacji zamieszczonych pod zestawem danych na stronie z której byl on pobrany można także odnalezc informacje. O tym że zostal on zbudowany do badania prawdopodobienstwa odejscia klientów z banku, a nie badania ich potencjalnej aktywnosci. <br/>
+<br/>
+W dalszej czesci przedstawiamy jeszcze próby zwiekszenia efektywnosci bez pozostawionego komentarza(ponieważ wyniki sa zblizone do tych uzyskanych wyzej) a jedynie z wygenerowanymi modelami i statystykami dotyczacymi efektywnosci. <br/>
+#### ***Próby zwiekszenia efektywnosci***<br/>
+<br/>
+<br/>
+Dodanie zmiennej Geography do modelu:<br/>
+<br/>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dane2 <- dane1
+logit_1 <- glm(IsActiveMember ~CreditScoreNew + Gender + AgeNew + Tenure + Geography, data=dane2, family=binomial)
+probit_1 <- glm(IsActiveMember ~CreditScoreNew + Gender + AgeNew + Tenure + Geography,
+              data=dane2, family=binomial(link = probit))
+summary(logit_1)$coefficients%>%
+  kbl(caption = "Model Logitowy") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+summary(probit_1)$coefficients%>%
+  kbl(caption = "Model Probitowy") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+#Tab Traf
+tab_traf <- data.frame(obserwowane=dane2$IsActiveMember, przewidywane=ifelse(logit_1$fitted.values>0.5, 1, 0))
+tab_traf1 <- data.frame(obserwowane=dane2$IsActiveMember, przewidywane=ifelse(probit_1$fitted.values>0.5, 1, 0))
+wyniki_miary_pred <- rbind(Logitowy =miary_pred(model=logit_1, Y=dane2$IsActiveMember, p=0.5),
+                           Probitowy=miary_pred(model=probit_1, Y=dane2$IsActiveMember, p=0.5))
+t(wyniki_miary_pred) %>%  
+  kbl(caption = "Miary predykcji na podstawie tablicy trafnosci dla modeli: logit, probit") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+#AUC
+pole_AUC_logit<-as.numeric(auc(dane2$IsActiveMember, logit_1$fitted.values))
+pole_AUC_probit<-as.numeric(auc(dane2$IsActiveMember, probit_1$fitted.values))
+data.frame(row.names = c("Logit","Probit"),Pole_AUC = rbind(pole_AUC_logit, pole_AUC_probit)) %>%  
+  kbl(caption = "AUC") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+<br/>Przyjecie wszystkich zmiennych w zestawie danych:<br/>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dane3 <- dane1
+logit_1 <- glm(IsActiveMember ~ ., data=dane3, family=binomial)
+probit_1 <- glm(IsActiveMember ~ .,
+              data=dane3, family=binomial(link = probit))
+summary(logit_1)$coefficients%>%
+  kbl(caption = "Model Logitowy") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+summary(probit_1)$coefficients%>%
+  kbl(caption = "Model Probitowy") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+#Tab Traf
+tab_traf <- data.frame(obserwowane=dane2$IsActiveMember, przewidywane=ifelse(logit_1$fitted.values>0.5, 1, 0))
+tab_traf1 <- data.frame(obserwowane=dane2$IsActiveMember, przewidywane=ifelse(probit_1$fitted.values>0.5, 1, 0))
+wyniki_miary_pred <- rbind(Logitowy =miary_pred(model=logit_1, Y=dane2$IsActiveMember, p=0.5),
+                           Probitowy=miary_pred(model=probit_1, Y=dane2$IsActiveMember, p=0.5))
+t(wyniki_miary_pred) %>%  
+  kbl(caption = "Miary predykcji na podstawie tablicy trafnosci dla modeli: logit, probit") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+#AUC
+pole_AUC_logit<-as.numeric(auc(dane2$IsActiveMember, logit_1$fitted.values))
+pole_AUC_probit<-as.numeric(auc(dane2$IsActiveMember, probit_1$fitted.values))
+data.frame(row.names = c("Logit","Probit"),Pole_AUC = rbind(pole_AUC_logit, pole_AUC_probit)) %>%  
+  kbl(caption = "AUC") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+
+
