@@ -1,0 +1,284 @@
+---
+title: "Projekt Zaliczeniowy - SQL i Imputacje danych"
+author: "Jakub Kur, Łukasz Szweda, Jula Bulińska"
+date: "01 08 2021"
+output: html_document
+---
+Projekt zaliczeniowy wykonalismy wykorzystujac baze danych "Sakila". To fikcyjna baza danych zaprojektowana do reprezentowania wypożyczalni DVD. Baza danych zostala oparta na SQL3Lite
+Projekt zostal podzielony na dwa etapy:<br/> w pierwszym wykorzystujemy SQL do stworzenia zapytan w celu wyciagniecia interesujacych nas informacji z bazy danych. W projekcie wykorzystalismy miedzy innymi takie funkcjonalnosci jak: filtrowanie; funkcje agregujace; sortowanie; laczenie danych.<br/>
+<br/>
+Dla powstalych zlaczonych tablic sprawdzilismy braki danych. Zbadalismy ich statystyki i rozklady. Nastepnie dokonalismy imputacji brakujacych danych i porównalismy nowo powstale rozklady i statystyki w celu zdefiniowania roznic.<br/> 
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Biblioteki wykoryzstane
+library(dplyr) # manipulacja danymi
+library(odbc)# sql
+library(DBI) # sql 
+library("RSQLite") # sqllite
+library(ggplot2) # wykresy
+library(kableExtra) # tablice markdown
+library(igraph) #grafy
+library(networkD3) #grafy
+```
+```{r}
+# Podlaczenie do bazy danych z pliku
+con <- dbConnect(RSQLite::SQLite(), 'F:/SQL_TID Projekt/sqlite-sakila.db')
+```
+Dostepne tablice opracowywanej bazy danych zostały zaprezentowane w tablicy poniżej:<br/>
+```{sql, connection=con, output.var = "table_names"}
+SELECT name
+            FROM sqlite_master 
+            WHERE type ='table' AND name NOT LIKE 'sqlite_%';
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+table_names %>%
+  kbl(caption = "Tablica 1 - Nazwy tablic w bazie danych `sqlite-sakila`")%>% column_spec(column = 1, width = "350px") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+Wysylajac ponizsze zapytanie mozna sprawdzic nazwy kolumn poszczegolnej tablicy z bazy danych:  
+```{sql, connection=con}
+SELECT name FROM PRAGMA_TABLE_INFO('actor')
+```
+<br/>
+<br/>
+Na podstawie dostepnych informacji z bazy danych stworzony zostal diagram polaczen miedzy tablicami, zaprezentowany ponizej. W dalszej czesci projektu posluzyl on jako pomoc w definiowaniu mozliwych polaczen pomiedzy tablicami i usprawnieniu pracy. <br/>
+<center>![](F:/SQL_TID Projekt/SQLite3 Sakila Sample Database ERD.png)</center><br/>
+```{r message=FALSE, warning=FALSE,fig.width=10, fig.height=10}
+#dbSendQuery - funkcja z pakietu DBI pozwalajaca na tworzenie zapytan SQL w srodowisku R
+for (i in 1:nrow(table_names)){
+  colnames = dbSendQuery(con,
+            paste0("SELECT name FROM PRAGMA_TABLE_INFO('",table_names[i,1],"')"))
+  colnames = dbFetch(colnames)
+  colnames(colnames) = table_names[i,1]
+  assign(x = table_names[i,1],
+         value = colnames)
+}
+table_colnames = data.frame(do.call(rbind, Map(cbind, Tablica = names(c(actor,address,category,city,country,customer,film,film_actor,film_category,film_text,inventory,language,payment,rental,staff,store)), Kolumna = c(actor,address,category,city,country,customer,film,film_actor,film_category,film_text,inventory,language,payment,rental,staff,store))))
+#Network plot
+p <- simpleNetwork(table_colnames, height="100px", width="100px",        
+        linkDistance = 10,          # distance between node. Increase this value to have more space between nodes
+        charge = -900,                # numeric value indicating either the strength of the node repulsion (negative value) or attraction (positive value)
+        fontSize = 14,               # size of the node names
+        fontFamily = "serif",       # font og node names
+        linkColour = "#666",        # colour of edges, MUST be a common colour for the whole graph
+        nodeColour = "red",     # colour of nodes, MUST be a common colour for the whole graph
+        opacity = 0.9,              # opacity of nodes. 0=transparent. 1=no transparency
+        zoom = T                    # Can you zoom on the figure?
+        )
+p
+```
+
+W srodowisku R istnieja dwa proste sposoby na wysylanie zapytan SQL, bezposrednio zapytaniem SQL lub wykorzystujac pakiety dostepne w R. Jednym z nich jest DBI który przesyla kwerende do bazy danych. Istnieja takze rozwiazania które automatycznie rozpoznaja i tlumacza swoja specyficzna skladnie na dopasowana kwerende w rozpoznanej typie bazy SQL (dbplyr) <br/>
+[Bookdown.org - R Markdown - SQL](https://bookdown.org/yihui/rmarkdown/language-engines.html#sql)<br/>
+[DBI - Rstudio.com](https://db.rstudio.com/r-packages/dbi/)<br/>
+[dbplyr - Rstudio.com](https://db.rstudio.com/r-packages/dplyr/)<br/>
+Wykorzystujac bezposrednie kwerendyz poziomu RMarkdown obligatoryjnym jest okreslenie danego polaczenia i w wypadku przypisania zmiennej do srodowiska R okreslenie jej nazwy jak tutaj: __*```{sql, connection=con, output.var = "table_names"}*__ <br/>
+<br/>
+Na podstawie omawianej bazy swtorzono 20 zapytan (kwerend):
+
+Podstawowe zapytanie SQL - imiona i nazwiska 8 osob z tablicy *actor*.<br/>
+```{sql, connection=con}
+SELECT DISTINCT actor.first_name AS Imie, actor.last_name AS Nazwisko
+FROM actor 
+LIMIT 8
+```
+Top 10 aktorow wystepujacych w najwiekszej ilosci filmow:<br/>
+```{sql, connection=con}
+SELECT film_actor.actor_id AS ID, actor.first_name AS Imie, actor.last_name AS Nazwisko, COUNT(film_actor.actor_id) AS Liczba_filmow
+                   FROM actor
+                   INNER JOIN film_actor ON film_actor.actor_id=actor.actor_id
+                   GROUP BY film_actor.actor_id
+                   ORDER BY liczba_filmow DESC
+                   LIMIT 10
+```
+Sredni czas trwania wypozyczenia filmow przez klientow (w dniach): <br/>
+```{sql, connection=con}
+SELECT AVG(rental_duration) AS sredni_czas
+                  FROM film
+```
+Liczba filmow w bazie ktore sa przeznaczone dla doroslych (na podstawie MPA film ratings - G, G, PG-13, R, NC-17): <br/>
+```{sql, connection=con}
+SELECT COUNT(rating) AS filmy_dla_doroslych
+                  FROM film
+                   WHERE rating='NC-17'
+```
+Typy filmow wedlug metrazu (pelnometrazowy, sredniometrazowy, krotkometrazowy) (wyszukanie ograniczone do 10 pierwszych, lacznie dostepnych 1000)
+```{sql, connection=con}
+SELECT film_id, title AS tytul, length AS dlugosc, CASE
+                   WHEN length > 70 THEN 'pelnometrazowy'
+                   WHEN length < 30 THEN 'krotkometrazowy'
+                   ELSE 'sredniometrazowy'
+                   END as 'metraz filmu'
+                   FROM film
+                   LIMIT 10
+```
+Top 5 najczesciej wypozyczanych filmow
+```{sql, connection=con}
+SELECT inventory.film_id, film.title AS tytul, COUNT(rental.inventory_id) AS ilosc_wypozyczen
+                   FROM film
+                   INNER JOIN inventory on film.film_id=inventory.film_id
+                   INNER JOIN rental on rental.inventory_id=inventory.inventory_id
+                   GROUP BY film.title
+                   ORDER BY ilosc_wypozyczen DESC
+                   LIMIT 5
+```
+Ranking miesiecy z najwieksza sprzedaza w obu sklepach w 2007 roku
+```{sql, connection=con}
+SELECT substr(payment_date, 6, 2) AS miesiac, SUM(amount) AS sprzedaz
+                   FROM payment
+                   GROUP BY miesiac
+                   ORDER BY miesiac DESC
+```
+Wartosc wszystkich zamowien w lipcu 2005 roku dla sklepu numer 1
+```{sql, connection=con}
+SELECT SUM(amount)
+                   FROM payment
+                   WHERE payment_date LIKE '2005-07%'
+```
+Kraje, z ktorych glownie pochodzi wypozyczajacy
+```{sql, connection=con}
+SELECT country.country AS Kraj, COUNT(country.country) AS Liczba_klientow
+                   FROM customer
+                   INNER JOIN address on customer.address_id=address.address_id
+                   INNER JOIN city on address.city_id=city.city_id
+                   INNER JOIN country on city.country_id=country.country_id
+                   GROUP BY kraj
+                   ORDER BY liczba_klientow DESC
+                   LIMIT 40
+```
+Klienci, ktorzy zaplacili 0$
+```{sql, connection=con}
+SELECT customer.customer_id, customer.first_name, customer.last_name, payment.amount
+                   FROM customer
+                   LEFT JOIN payment ON customer.customer_id=payment.customer_id
+                   WHERE payment.amount=0
+```
+
+Ilosc jezyków filmow( wszystkie filmy w bazie sa w jezyku angielskim)
+```{sql, connection=con}
+SELECT language.name, COUNT(language.name) AS Sumy_jezykow_filmow
+FROM film
+LEFT JOIN language ON film.language_id=language.language_id
+
+```
+
+Popularnosc ogladanych aktorow (na podstawie sredniej dlugosci najmu i sredniej oceny najmu)(top20)
+```{sql, connection=con}
+SELECT actor.first_name, actor.last_name, avg(rental_duration) as popularnosc_dlugosc_sr, avg(rental_rate) as popularnosc_ocena_sr
+from film_actor
+LEFT JOIN actor ON film_actor.actor_id=actor.actor_id
+LEFT JOIN film ON film_actor.film_id=film.film_id
+GROUP BY actor.last_name
+ORDER BY popularnosc_dlugosc_sr desc
+LIMIT 20
+```
+Rodzaje kategorii
+```{sql, connection=con}
+SELECT DISTINCT name
+FROM category
+```
+Ilosc filmow wedlug kategorii
+```{sql, connection=con}
+SELECT distinct category.name, count(category.name) as ilosc_wg_kat
+FROM film
+INNER JOIN film_category ON film.film_id=film_category.film_id
+INNER JOIN category ON film_category.category_id=category.category_id
+GROUP BY category.name
+ORDER BY ilosc_wg_kat desc
+```
+Srednia dlugosc wynajmu wg kategorii
+```{sql, connection=con}
+SELECT distinct category.name, avg(rental_duration) AS rental_dur
+FROM film
+INNER JOIN film_category ON film.film_id=film_category.film_id
+INNER JOIN category ON film_category.category_id=category.category_id
+GROUP BY category.name
+ORDER BY rental_dur DESC
+```
+Srednia ocena najmu wg kategorii 
+```{sql, connection=con}
+SELECT distinct category.name, avg(rental_rate) AS rental_rate
+FROM film
+INNER JOIN film_category ON film.film_id=film_category.film_id
+INNER JOIN category ON film_category.category_id=category.category_id
+GROUP BY category.name
+ORDER BY rental_rate DESC
+```
+Liczba wystapien wedlug aktorow
+```{sql, connection=con}
+SELECT
+    actor.first_name || ' ' || actor.last_name AS Name, COUNT(film.title) AS ilsc_wystapien_w_filmach
+FROM film_actor 
+JOIN film
+ON film_actor.film_id = film.film_id
+JOIN actor
+ON film_actor.actor_id = actor.actor_id
+GROUP BY film.title
+ORDER BY ilsc_wystapien_w_filmach DESC
+limit 15
+```
+Baza nieaktywnych klientow i ich adresy mailowe:
+```{sql, connection=con}
+SELECT c.first_name, c.last_name, c.email, CASE
+WHEN active=0 THEN 'nieaktywny'
+END AS aktywnosc
+FROM customer AS c
+WHERE active=0
+```
+Ilosc klientow
+```{sql, connection=con}
+SELECT distinct COUNT(customer_id)
+from customer
+```
+Klienci wedlug miast (wszyscy pochodza z jednego)
+```{sql, connection=con}
+SELECT c1.city, count(c1.city)
+FROM customer as c
+JOIN address as a 
+ON c.address_id=a.address_id
+JOIN city as c1
+ON a.city_id=c1.city_id
+```
+srednia/max/min/ilosc/suma  platnosci przyjetej przez pracownika z jego adresem sklepu
+```{sql, connection=con}
+SELECT s.first_name, s.last_name,a.address || ' - '  || city as adres_sklepu, avg(p.amount) as sr_kwota ,max(p.amount) as max_kwota ,min(p.amount) as min_kwota, count(p.amount) as ilosc_platnosci, sum(p.amount) as suma_platnosci
+FROM staff as s
+JOIN payment as p
+ON s.staff_id=p.staff_id
+JOIN store as s1
+ON s.store_id=s1.store_id
+JOIN address as a
+ON s1.address_id=a.address_id
+JOIN city as c
+ON a.city_id=c.city_id
+group by s.last_name
+```
+15 osob z najwiekszymi platnosciami od najwiekszych do najmniejszych z informacja o ich adresie.
+```{sql, connection=con}
+SELECT first_name, last_name, SUM(p.amount) as payment_sum, address
+FROM customer as c
+JOIN payment as p
+ON c.customer_id=p.payment_id
+JOIN store as s
+ON c.store_id=s.store_id
+JOIN address as a
+ON s.address_id=a.address_id
+WHERE active= 1
+GROUP BY c.customer_id
+ORDER BY payment_sum DESC
+LIMIT 15
+```
+
+Liczba filmow w ktorej dostepnych w sklepie w ktorej bral udzial dany aktor (20 pierwszych)
+```{sql, connection=con}
+SELECT first_name, last_name, COUNT(f.title) as liczba_tytulow 
+FROM actor as a
+JOIN film_actor AS fa
+ON a.actor_id=fa.actor_id
+JOIN film as f
+ON fa.film_id=f.film_id
+GROUP BY fa.actor_id
+ORDER BY liczba_tytulow DESC
+LIMIT 20
+```
+

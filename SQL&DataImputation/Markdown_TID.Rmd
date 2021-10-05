@@ -1,0 +1,238 @@
+---
+title: "Projekt Zaliczeniowy - Techniki Imputacji Danych"
+author: "Jakub Kur, Jula Bulińska, Łukasz Szweda"
+date: "01 08 2021"
+output: html_document
+---
+
+
+
+Import do R; nadanie brakujacych nazw kolumn; Zmiana wartosci ze znakiem zapytania na niewystepujace **"?" -> NA**
+```{r include=FALSE}
+{coltitles = c("communityname","state","countyCode","communityCode","fold","population","householdsize","racepctblack","racePctWhite","racePctAsian","racePctHisp","agePct12t21","agePct12t29","agePct16t24","agePct65up","numbUrban","pctUrban","medIncome","pctWWage","pctWFarmSelf","pctWInvInc","pctWSocSec","pctWPubAsst","pctWRetire","medFamInc","perCapInc","whitePerCap","blackPerCap","indianPerCap","AsianPerCap","OtherPerCap","HispPerCap","NumUnderPov","PctPopUnderPov",
+"PctLess9thGrade","PctNotHSGrad","PctBSorMore","PctUnemployed","PctEmploy","PctEmplManu","PctEmplProfServ","PctOccupManu", #### No longer sure of difference from PctEmplManu - may include unemployed manufacturing workers ####
+"PctOccupMgmtProf","MalePctDivorce","MalePctNevMarr","FemalePctDiv","TotalPctDiv","PersPerFam","PctFam2Par","PctKids2Par","PctYoungKids2Par","PctTeen2Par","PctWorkMomYoungKids","PctWorkMom","NumKidsBornNeverMar","PctKidsBornNeverMar","NumImmig","PctImmigRecent","PctImmigRec5","PctImmigRec8","PctImmigRec10","PctRecentImmig","PctRecImmig5","PctRecImmig8","PctRecImmig10","PctSpeakEnglOnly","PctNotSpeakEnglWell","PctLargHouseFam","PctLargHouseOccup","PersPerOccupHous","PersPerOwnOccHous",
+"PersPerRentOccHous","PctPersOwnOccup","PctPersDenseHous","PctHousLess3BR","MedNumBR","HousVacant","PctHousOccup","PctHousOwnOcc","PctVacantBoarded","PctVacMore6Mos","MedYrHousBuilt","PctHousNoPhone","PctWOFullPlumb","OwnOccLowQuart","OwnOccMedVal","OwnOccHiQuart","OwnOccQrange","RentLowQ","RentMedian","RentHighQ","RentQrange","MedRent","MedRentPctHousInc","MedOwnCostPctInc","MedOwnCostPctIncNoMtg","NumInShelters","NumStreet","PctForeignBorn","PctBornSameState","PctSameHouse85",
+"PctSameCity85","PctSameState85","LemasSwornFT","LemasSwFTPerPop","LemasSwFTFieldOps","LemasSwFTFieldPerPop","LemasTotalReq","LemasTotReqPerPop","PolicReqPerOffic","PolicPerPop","RacialMatchCommPol","PctPolicWhite","PctPolicBlack","PctPolicHisp","PctPolicAsian","PctPolicMinor","OfficAssgnDrugUnits","NumKindsDrugsSeiz","PolicAveOTWorked","LandArea","PopDens","PctUsePubTrans","PolicCars","PolicOperBudg","LemasPctPolicOnPatr",
+"LemasGangUnitDeploy","LemasPctOfficDrugUn","PolicBudgPerPop","murders","murdPerPop","rapes","rapesPerPop","robberies","robbbPerPop","assaults","assaultPerPop","burglaries","burglPerPop","larcenies","larcPerPop","autoTheft","autoTheftPerPop","arsons","arsonsPerPop","ViolentCrimesPerPop","nonViolPerPop")} #naglowki, zmienna coltitles
+```
+```{r message=FALSE, warning=FALSE, include=FALSE}
+df = read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/00211/CommViolPredUnnormalizedData.txt", header = FALSE)
+library(tidyverse) # R Version 4.0.2 #uniwersum tidyverse, zawiera biblioteki w tym bardzo duzo do organizacji danych
+
+#Organizacja zestawu danych
+colnames(df) = coltitles #set colnames (deletes first row held in colnames variable)
+df[df == "?"] = NA #set ? as NA values
+```
+Informacje o zmiennych można znaleźć na stronie z danymi  
+[Communities and Crime Unnormalized Data Set](https://archive.ics.uci.edu/ml/datasets/Communities+and+Crime+Unnormalized)
+```{r include=FALSE}
+{var_desc = c("Community name - not predictive - for information only (string)","US state (by 2 letter postal abbreviation)(nominal)","numeric code for county - not predictive, and many missing values (numeric)","numeric code for community - not predictive and many missing values (numeric)","fold number for non-random 10 fold cross validation, potentially useful for debugging, paired tests - not predictive (numeric - integer)","population for community: (numeric - expected to be integer)","mean people per household (numeric - decimal)","percentage of population that is african american (numeric - decimal)","percentage of population that is caucasian (numeric - decimal)","percentage of population that is of asian heritage (numeric - decimal)","percentage of population that is of hispanic heritage (numeric - decimal)","percentage of population that is 12-21 in age (numeric - decimal)","percentage of population that is 12-29 in age (numeric - decimal)","percentage of population that is 16-24 in age (numeric - decimal)","percentage of population that is 65 and over in age (numeric - decimal)","number of people living in areas classified as urban (numeric - expected to be integer)","percentage of people living in areas classified as urban (numeric - decimal)","median household income (numeric - may be integer)","percentage of households with wage or salary income in 1989 (numeric - decimal)","percentage of households with farm or self employment income in 1989 (numeric - decimal)","percentage of households with investment / rent income in 1989 (numeric - decimal)",
+"percentage of households with social security income in 1989 (numeric - decimal)","percentage of households with public assistance income in 1989 (numeric - decimal)","percentage of households with retirement income in 1989 (numeric - decimal)","median family income (differs from household income for non-family households) (numeric - may be integer)","per capita income (numeric - decimal)","per capita income for caucasians (numeric - decimal)","per capita income for african americans (numeric - decimal)","per capita income for native americans (numeric - decimal)","per capita income for people with asian heritage (numeric - decimal)","per capita income for people with 'other' heritage (numeric - decimal)","per capita income for people with hispanic heritage (numeric - decimal)","number of people under the poverty level (numeric - expected to be integer)","percentage of people under the poverty level (numeric - decimal)","percentage of people 25 and over with less than a 9th grade education (numeric - decimal)","percentage of people 25 and over that are not high school graduates (numeric - decimal)","percentage of people 25 and over with a bachelors degree or higher education (numeric - decimal)","percentage of people 16 and over, in the labor force, and unemployed (numeric - decimal)","percentage of people 16 and over who are employed (numeric - decimal)","percentage of people 16 and over who are employed in manufacturing (numeric - decimal)",
+"percentage of people 16 and over who are employed in professional services (numeric - decimal)","percentage of people 16 and over who are employed in manufacturing (numeric - decimal)","percentage of people 16 and over who are employed in management or professional occupations (numeric - decimal)","percentage of males who are divorced (numeric - decimal)","percentage of males who have never married (numeric - decimal)","percentage of females who are divorced (numeric - decimal)","percentage of population who are divorced (numeric - decimal)","mean number of people per family (numeric - decimal)","percentage of families (with kids) that are headed by two parents (numeric - decimal)","percentage of kids in family housing with two parents (numeric - decimal)","percent of kids 4 and under in two parent households (numeric - decimal)","percent of kids age 12-17 in two parent households (numeric - decimal)","percentage of moms of kids 6 and under in labor force (numeric - decimal)","percentage of moms of kids under 18 in labor force (numeric - decimal)","number of kids born to never married (numeric - expected to be integer)","percentage of kids born to never married (numeric - decimal)",
+"total number of people known to be foreign born (numeric - expected to be integer)","percentage of _immigrants_ who immigated within last 3 years (numeric - decimal)","percentage of _immigrants_ who immigated within last 5 years (numeric - decimal)","percentage of _immigrants_ who immigated within last 8 years (numeric - decimal)","percentage of _immigrants_ who immigated within last 10 years (numeric - decimal)","percent of _population_ who have immigrated within the last 3 years (numeric - decimal)","percent of _population_ who have immigrated within the last 5 years (numeric - decimal)","percent of _population_ who have immigrated within the last 8 years (numeric - decimal)","percent of _population_ who have immigrated within the last 10 years (numeric - decimal)","percent of people who speak only English (numeric - decimal)","percent of people who do not speak English well (numeric - decimal)","percent of family households that are large (6 or more) (numeric - decimal)","percent of all occupied households that are large (6 or more people) (numeric - decimal)","mean persons per household (numeric - decimal)","mean persons per owner occupied household (numeric - decimal)","mean persons per rental household (numeric - decimal)","percent of people in owner occupied households (numeric - decimal)","percent of persons in dense housing (more than 1 person per room) (numeric - decimal)","percent of housing units with less than 3 bedrooms (numeric - decimal)","median number of bedrooms (numeric - decimal)","number of vacant households (numeric - expected to be integer)","percent of housing occupied (numeric - decimal)","percent of households owner occupied (numeric - decimal)","percent of vacant housing that is boarded up (numeric - decimal)","percent of vacant housing that has been vacant more than 6 months (numeric - decimal)","median year housing units built (numeric - may be integer)","percent of occupied housing units without phone (in 1990, this was rare!) (numeric - decimal)","percent of housing without complete plumbing facilities (numeric - decimal)",
+"owner occupied housing - lower quartile value (numeric - decimal)","owner occupied housing - median value (numeric - decimal)","owner occupied housing - upper quartile value (numeric - decimal)","owner occupied housing - difference between upper quartile and lower quartile values (numeric - decimal)","rental housing - lower quartile rent (numeric - decimal)","rental housing - median rent (Census variable H32B from file STF1A) (numeric - decimal)","rental housing - upper quartile rent (numeric - decimal)","rental housing - difference between upper quartile and lower quartile rent (numeric - decimal)","median gross rent (Census variable H43A from file STF3A - includes utilities) (numeric - decimal)","median gross rent as a percentage of household income (numeric - decimal)","median owners cost as a percentage of household income - for owners with a mortgage (numeric - decimal)","median owners cost as a percentage of household income - for owners without a mortgage (numeric - decimal)","number of people in homeless shelters (numeric - expected to be integer)","number of homeless people counted in the street (numeric - expected to be integer)","percent of people foreign born (numeric - decimal)","percent of people born in the same state as currently living (numeric - decimal)","percent of people living in the same house as in 1985 (5 years before) (numeric - decimal)","percent of people living in the same city as in 1985 (5 years before) (numeric - decimal)","percent of people living in the same state as in 1985 (5 years before) (numeric - decimal)","number of sworn full time police officers (numeric - expected to be integer)","sworn full time police officers per 100K population (numeric - decimal)","number of sworn full time police officers in field operations (on the street as opposed to administrative etc) (numeric - expected to be integer)","sworn full time police officers in field operations (on the street as opposed to administrative etc) per 100K population (numeric - decimal)","total requests for police (numeric - expected to be integer)","total requests for police per 100K popuation (numeric - decimal)","total requests for police per police officer (numeric - decimal)","police officers per 100K population (numeric - decimal)",'"a measure of the racial match between the community and the police force. High values indicate proportions in community and police force are simi"lar ("umeric - decimal)"',"percent of police that are caucasian (numeric - decimal)","percent of police that are african american (numeric - decimal)",
+"percent of police that are hispanic (numeric - decimal)","percent of police that are asian (numeric - decimal)","percent of police that are minority of any kind (numeric - decimal)","number of officers assigned to special drug units (numeric - expected to be integer)","number of different kinds of drugs seized (numeric - expected to be integer)","police average overtime worked (numeric - decimal)","land area in square miles (numeric - decimal)","population density in persons per square mile (numeric - decimal)","percent of people using public transit for commuting (numeric - decimal)","number of police cars (numeric - expected to be integer)","police operating budget (numeric - may be integer)","percent of sworn full time police officers on patrol (numeric - decimal)","gang unit deployed (numeric - integer - but really nominal - 0 means NO, 10 means YES, 5 means Part Time)","percent of officers assigned to drug units (numeric - decimal)","police operating budget per population (numeric - decimal)",
+"number of murders in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of murders per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of rapes in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of rapes per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of robberies in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of robberies per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of assaults in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of assaults per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of burglaries in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of burglaries per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of larcenies in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of larcenies per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of auto thefts in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of auto thefts per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","number of arsons in 1995 (numeric - expected to be integer) potential GOAL attribute (to be predicted)","number of arsons per 100K population (numeric - decimal) potential GOAL attribute (to be predicted)","total number of violent crimes per 100K popuation (numeric - decimal) GOAL attribute (to be predicted)","total number of non-violent crimes per 100K popuation (numeric - decimal) potential GOAL attribute (to be predicted)")} # Variable Description var_desc
+{var_typzmiennej = c("Nominalna","Nominalna","Nominalna","Nominalna","Nominalna","Ilorazowa","Ilorazowa","Ilorazowa",
+"Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa",
+"Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa",
+"Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa","Ilorazowa")} # Variable Type var_typzmiennej
+```
+Po zapoznaniu się ze z tymi informacjami nadano rodzaj dla pierwszych trzydziestu zmiennych zweryfikowano ich typ:
+```{r}
+library(knitr) #formating tables
+df2 = data.frame(VariableName = coltitles[1:30], VariableDesc = var_desc[1:30],VariableType = var_typzmiennej )
+kable(df2)
+```
+
+Liczba wierszy, w których chociaż raz wystąpiła zmienna z brakującymi danymi to 2103 z 2215. Usunięcie wszystkich niepełnych wierszy tabeli jest zatem niedopuszczalne bo strata danych wyniosła by  94.94%
+22 zmienne posiadają powyżej 80% braków danych. Klasyfikuje je to do usunięcia ze zbioru.
+```{r echo=FALSE}
+print("Ilosc zmiennych z brakujacymi rekordami: ")
+nrow(df[!complete.cases(df),])
+```
+```{r}
+missing_perc = c()
+#check missing by col
+for (i in 1:147){
+  j = length(df[is.na(df[,i] == TRUE),i])/2115
+  missing_perc = c(missing_perc,j)}
+```
+```{r echo=FALSE}
+print("Ilosc zmiennych z brakiem powyzej 80% rekordow: ")
+length(missing_perc[missing_perc>0.8]) #ilosc 
+hist(missing_perc) # histogram brakow
+df = df[,missing_perc < 0.8]
+df[110:125] = as.data.frame(lapply(df[110:125],as.numeric)) # fix some char vectors
+```
+Ilosc zmiennych z brakami i histogram pokazujacy wielkosc tych brakow:
+```{r}
+#check missing by col
+missing_perc = c()
+length(colnames(df))
+for (i in 1:125){
+  j = length(df[is.na(df[,i] == TRUE),i])/2115
+  missing_perc = c(missing_perc,j)}
+hist(missing_perc[missing_perc>0])
+df3 = df[,missing_perc >0]
+```
+Tablica korelacji / korelogram zmiennych z brakami danych z usunietymi wierszami zawierajacymi braki.
+```{r}
+varwithmissings = df[,missing_perc>0]
+varwithmissings <- as.data.frame(lapply(varwithmissings,as.numeric))
+cortable = cor(na.omit(varwithmissings))
+library(ggcorrplot)
+ggcorrplot::ggcorrplot(cortable, hc.order = TRUE, type = "lower",
+           lab = TRUE)
+```
+Dendrogram braków danych.
+```{r}
+dd <- dist(cortable, method = "euclidean")
+hc <- hclust(dd, method = "ward.D")
+hcd = as.dendrogram(hc)
+plot(hcd, horiz = FALSE)
+```
+Wnioski:  <br/>
+- Braki w rapesPerPop i w rapes są takie same bo **rapesPerPop=rapes/population**  
+- ViolentCrimesPerPop sa **MNAR**(mostly not at random) sa skorelowane z brakami rapes i assaults(takze skladniki violentcrimes)  
+- nonViolPerPop są skorelowane z arsons, burglaries i autoTheft - skladniki nonViolPerPop - **MNAR**  
+- Braki w robberies, assaults, burglaries, larcenies, autoTheft - **MCAR**.  
+  
+IMPUTACJA DANYCH:  
+srednimi  
+algorytm KNN  metoda warda
+medianami  
+  
+Ilosc brakow w zmiennych robberies, rapes, burglaries, assaults:  
+```{r}
+meanimput = df
+paste('ilosc brakow w robberies: ' ,length(meanimput$robberies[is.na(meanimput$robberies) == TRUE]) )
+paste('ilosc brakow w rapes: ' ,length(meanimput$rapes[is.na(meanimput$rapes) == TRUE]))
+paste('ilosc brakow w burglaries: ' ,length(meanimput$burglaries[is.na(meanimput$burglaries) == TRUE]))
+paste('ilosc brakow w assaults: ' ,length(meanimput$assaults[is.na(meanimput$assaults) == TRUE]))
+```
+Imputacja i porownanie statystyk/ rozkladow zmiennych robberies, rapes, burglaries, assaults:   
+czerwony  - bez imputacji  
+blue - imputacja knn  
+green - imputacja srednimi  
+orange - imputacja medianami   
+```{r message=FALSE, warning=FALSE}
+library(VIM)
+library(ggplot2)
+#knn
+knnvalues = kNN(df, variable= c("robberies","rapes","burglaries","assaults"),k=5)
+#imputacja srednia
+meanimput = df
+meanimput$robberies[is.na(meanimput$robberies) == TRUE] = mean(as.numeric(df$robberies[is.na(df$robberies) ==FALSE ]))
+meanimput$rapes[is.na(meanimput$rapes) == TRUE] = mean(as.numeric(df$rapes[is.na(df$rapes) ==FALSE ]))
+meanimput$burglaries[is.na(meanimput$burglaries) == TRUE] = mean(as.numeric(df$burglaries[is.na(df$burglaries) ==FALSE ]))
+meanimput$assaults[is.na(meanimput$assaults) == TRUE] = mean(as.numeric(df$assaults[is.na(df$assaults) ==FALSE ]))
+#imputacja mediana
+medianimput = df
+medianimput$robberies[is.na(medianimput$robberies) == TRUE] = median(as.numeric(df$robberies[is.na(df$robberies) ==FALSE ]))
+medianimput$rapes[is.na(medianimput$rapes) == TRUE] = median(as.numeric(df$rapes[is.na(df$rapes) ==FALSE ]))
+medianimput$burglaries[is.na(medianimput$burglaries  ) == TRUE] = median(as.numeric(df$burglaries[is.na(df$burglaries) ==FALSE ]))
+medianimput$assaults[is.na(medianimput$assaults) == TRUE] = median(as.numeric(df$assaults[is.na(df$assaults) ==FALSE ]))
+#zmiana rozkladow i statystyk do zmiennych po imputacji
+#sumstats
+summary(df[,c("robberies","rapes","burglaries","assaults")])
+summary(knnvalues[,c("robberies","rapes","burglaries","assaults")])
+summary(meanimput[,c("robberies","rapes","burglaries","assaults")])
+summary(medianimput[,c("robberies","rapes","burglaries","assaults")])
+#histplots , ostatni percentyl - 95% , wartosci odstajace uciete
+
+ggplot() +
+  geom_density(aes(x = df$robberies), colour = "red") +
+  geom_density(aes(x = knnvalues$robberies), colour = "blue") +
+  geom_density(aes(x = meanimput$robberies), colour = "green") +
+  geom_density(aes(x = medianimput$robberies), colour = "orange")+
+  xlim(as.vector(quantile(df$robberies[is.na(df$robberies) == FALSE], c(.00, .98))))
+ggplot() +
+  geom_density(aes(x = df$rapes), colour = "red") +
+  geom_density(aes(x = knnvalues$rapes), colour = "blue") +
+  geom_density(aes(x = meanimput$rapes), colour = "green") +
+  geom_density(aes(x = medianimput$rapes), colour = "orange")+
+  xlim(as.vector(quantile(df$rapes[is.na(df$rapes) == FALSE], c(.00, .98))))
+ggplot() +
+  geom_density(aes(x = df$burglaries), colour = "red") +
+  geom_density(aes(x = knnvalues$burglaries), colour = "blue") +
+  geom_density(aes(x = meanimput$burglaries), colour = "green") +
+  geom_density(aes(x = medianimput$burglaries), colour = "orange")+
+  xlim(as.vector(quantile(df$burglaries[is.na(df$burglaries) == FALSE], c(.00, .98))))
+ggplot() +
+  geom_density(aes(x = df$assaults), colour = "red") +
+  geom_density(aes(x = knnvalues$assaults), colour = "blue") +
+  geom_density(aes(x = meanimput$assaults), colour = "green") +
+  geom_density(aes(x = medianimput$assaults), colour = "orange")+
+  xlim(as.vector(quantile(df$assaults[is.na(df$assaults) == FALSE], c(.00, .98))))
+```
+Ilosc brakow w zmiennych robbbPerPop, rapesPerPop, burglPerPop, assaultPerPop (zmienne gestosciowe):  
+```{r message=FALSE, warning=FALSE}
+meanimput = df
+paste('ilosc brakow w robberies: ' ,length(meanimput$robbbPerPop[is.na(meanimput$robbbPerPop) == TRUE]) )
+paste('ilosc brakow w rapes: ' ,length(meanimput$rapesPerPop[is.na(meanimput$rapesPerPop) == TRUE]))
+paste('ilosc brakow w burglaries: ' ,length(meanimput$burglPerPop[is.na(meanimput$burglPerPop) == TRUE]))
+paste('ilosc brakow w assaults: ' ,length(meanimput$assaultPerPop[is.na(meanimput$assaultPerPop) == TRUE]))
+```
+Imputacja i pornownanie statystyk / rozkladow zmiennych gestosciowych:
+```{r message=FALSE, warning=FALSE}
+#poprawienie zmiennych na numeryczne
+knnvalues = kNN(df, variable= c("robbbPerPop","rapesPerPop","burglPerPop","assaultPerPop"),k=5)
+#imputacja srednia
+meanimput$robbbPerPop[is.na(meanimput$robbbPerPop) == TRUE] = mean(as.numeric(df$robbbPerPop[is.na(df$robbbPerPop) ==FALSE ]))
+meanimput$rapesPerPop[is.na(meanimput$rapesPerPop) == TRUE] = mean(as.numeric(df$rapesPerPop[is.na(df$rapesPerPop) ==FALSE ]))
+meanimput$burglPerPop[is.na(meanimput$burglPerPop) == TRUE] = mean(as.numeric(df$burglPerPop[is.na(df$burglPerPop) ==FALSE ]))
+meanimput$assaultPerPop[is.na(meanimput$assaultPerPop) == TRUE] = mean(as.numeric(df$assaultPerPop[is.na(df$assaultPerPop) ==FALSE ]))
+#imputacja mediana
+medianimput$robbbPerPop[is.na(medianimput$robbbPerPop) == TRUE] = median(as.numeric(df$robbbPerPop[is.na(df$robbbPerPop) ==FALSE ]))
+medianimput$rapesPerPop[is.na(medianimput$rapesPerPop) == TRUE] = median(as.numeric(df$rapesPerPop[is.na(df$rapesPerPop) ==FALSE ]))
+medianimput$burglPerPop[is.na(medianimput$burglPerPop) == TRUE] = median(as.numeric(df$burglPerPop[is.na(df$burglPerPop) ==FALSE ]))
+medianimput$assaultPerPop[is.na(medianimput$assaultPerPop) == TRUE] = median(as.numeric(df$assaultPerPop[is.na(df$assaultPerPop) ==FALSE ]))
+#sumstats
+summary(df[,c("robbbPerPop","rapesPerPop","burglPerPop","assaultPerPop")])
+summary(knnvalues[,c("robbbPerPop","rapesPerPop","burglPerPop","assaultPerPop")])
+summary(meanimput[,c("robbbPerPop","rapesPerPop","burglPerPop","assaultPerPop")])
+summary(medianimput[,c("robbbPerPop","rapesPerPop","burglPerPop","assaultPerPop")])
+
+#histplots , ostatni percentyl - 95% , wartosci odstajace uciete
+#robbbPerPop
+ggplot() +
+  geom_density(aes(x = df$robbbPerPop), colour = "red") +
+  geom_density(aes(x = knnvalues$robbbPerPop), colour = "blue") +
+  geom_density(aes(x = meanimput$robbbPerPop), colour = "green") +
+  geom_density(aes(x = medianimput$robbbPerPop), colour = "orange")+
+  xlim(as.vector(quantile(df$robbbPerPop[is.na(df$robbbPerPop) == FALSE], c(.00, .98))))
+ggplot() +
+  geom_density(aes(x = df$rapesPerPop), colour = "red") +
+  geom_density(aes(x = knnvalues$rapesPerPop), colour = "blue") +
+  geom_density(aes(x = meanimput$rapesPerPop), colour = "green") +
+  geom_density(aes(x = medianimput$rapesPerPop), colour = "orange")+
+  xlim(as.vector(quantile(df$rapesPerPop[is.na(df$rapesPerPop) == FALSE], c(.00, .98))))
+ggplot() +
+  geom_density(aes(x = df$burglPerPop), colour = "red") +
+  geom_density(aes(x = knnvalues$burglPerPop), colour = "blue") +
+  geom_density(aes(x = meanimput$burglPerPop), colour = "green") +
+  geom_density(aes(x = medianimput$burglPerPop), colour = "orange")+
+  xlim(as.vector(quantile(df$burglPerPop[is.na(df$burglPerPop) == FALSE], c(.00, .98))))
+ggplot() +
+  geom_density(aes(x = df$assaultPerPop), colour = "red") +
+  geom_density(aes(x = knnvalues$assaultPerPop), colour = "blue") +
+  geom_density(aes(x = meanimput$assaultPerPop), colour = "green") +
+  geom_density(aes(x = medianimput$assaultPerPop), colour = "orange")+
+  xlim(as.vector(quantile(df$assaultPerPop[is.na(df$assaultPerPop) == FALSE], c(.00, .98))))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
