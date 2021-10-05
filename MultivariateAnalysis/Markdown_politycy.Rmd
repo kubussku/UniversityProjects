@@ -1,0 +1,482 @@
+---
+title: "Politycy"
+author: "Jakub Kur"
+date: "23 06 2021"
+output: html_document
+---
+Załadowanie danych:
+```{r}
+library(haven)
+df <- read_sav("BAZA DANYCH POLITYCY.sav")
+df = as.data.frame(df)
+```
+Sprawdzenie braków danych:
+```{r}
+print("Liczba udzielonych odpowiedzi:")
+nrow(df)
+sum(is.na(df))
+```
+Rekodowanie danych błędnych.  Wartości w Pyt. 1 z 0 zamienione na 1. Z 510 na 100.
+```{r}
+df1 = df[,c(1:144)]
+print("Ilosc wartosci zakodowanych ponizej 1")
+length(df1[df1<1])
+print("ilosc wartosci zakodowanych powyzej 100")
+length(df1[df1>100])
+#Zmiana wartosci ponizej 0 na 1 i powyzej 100 na 100
+df1[df1 < 1] = 1
+df1[df1 > 100] = 100
+
+```
+Analizy wstepne.  
+Charakterystyka respondentów pod wzgledem płci, wieku i wyksztalcenia:
+```{r}
+library(plotly)
+#wykres kolowy struktura plci
+plot_ly(type = "pie", labels = c("Mężczyzni","Kobiety"),values = table(df$Płeć), textinfo= 'label+percent',
+                                 insidetextorientation='radial',
+        marker = list(colors = c("#FFFFFF","#FF0000"),
+                      line = list(color = '#000000', width = 1)))
+
+#wykres sluplkowy wiek + wartosci procentowe
+Wiek_lab =   round(as.numeric(table(df$Wiek)[1:6]/nrow(df)*100),1)
+wiek_labels = c('18-29',
+                '30-39',
+                '40-49',
+                '50-59',
+                '60-69',
+                '70 i więcej')
+plot_ly(
+  x = wiek_labels,
+  y = table(df$Wiek),
+  type = "bar",
+  text = Wiek_lab,
+  textposition = 'auto',
+  marker = list(color = '#FF0000',
+                line = list(color = '#000000',
+                            width = 1)))
+#wykres slupkowy wyksztalcenie + wartosci procentowe
+Wyk_lab =   round(as.numeric(table(df$Wykształcenie)[1:3]/nrow(df)*100),1)
+Wyk_lab
+wyk_labels = c('Zawodowe',
+                'Średnie',
+                'Wyższe')
+plot_ly(
+  x = wyk_labels,
+  y = table(df$Wykształcenie),
+  type = "bar",
+  text = Wyk_lab,
+  textposition = 'auto',
+  marker = list(color = '#FF0000',
+                line = list(color = '#000000',
+                            width = 1)))
+```
+Niektóre funkcje do statystyk opisowych
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(moments)
+library(paramlink)
+std <- function(x) sd(x)/sqrt(length(x))
+getmode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+```
+Statystyki opisowe - Trzaskowski
+```{r echo=FALSE}
+#Funkcja  - statystyki opisowe
+Desc_stat = function(n,m){
+  Srednia = c()
+  Blad_Standardowy = c()
+  Mediana = c()
+  Dominanta = c()
+  Odchylenie_Standardowe = c()
+  Wariancja= c()
+  Skosnosc= c()
+  Kurtoza= c()
+  Minimum= c()
+  Maximum= c()
+  Prcentyl_25= c()
+  Prcentyl_75= c()
+  for (i in n:m){
+      Cecha = c("Uczciwy","Wiarygodny",
+  "Kompetentny","Konsekwentny",
+  "Charyzmatyczny","Empatyczny",
+  "Kulturalny","Atrakcyjny",
+  "Odpowiedzialny","Medialny",
+  "Reprezentacyjny","Tolerancyjny",
+  "Wykształcony","Szanowany",
+  "Elokwentny","Wpływowy")
+    Srednia = append(Srednia, mean(df1[,i]))
+    Blad_Standardowy = append(Blad_Standardowy, std(df1[,i]))
+    Mediana = append(Mediana, median(df1[,i]))
+    Dominanta = append(Dominanta, getmode(df1[,i]))
+    Odchylenie_Standardowe = append(Odchylenie_Standardowe, sd(df1[,i]))
+    Wariancja = append(Wariancja, var(df1[,i]))
+    Skosnosc = append(Skosnosc, skewness(df1[,i]))
+    Kurtoza = append(Kurtoza, kurtosis(df1[,i]))
+    Minimum = append(Minimum, min(df1[,i]))
+    Maximum = append(Maximum, max(df1[,i]))
+    Prcentyl_25 = append(Prcentyl_25, quantile(df1[,i],0.25))
+    Prcentyl_75 = append(Prcentyl_75, quantile(df1[,i],0.75))
+  }  
+knitr::kable(data.frame(Cecha, Srednia,Blad_Standardowy,Mediana,Dominanta,Odchylenie_Standardowe,Wariancja,Skosnosc,Kurtoza,Minimum,Maximum,Prcentyl_25,Prcentyl_75))
+}
+Desc_stat(1,16)
+```
+Statystyki opisowe - Kaczynski
+```{r echo=FALSE}
+Desc_stat(17,32)
+```
+Statystyki opisowe - Kosiniak-Kamysz
+```{r echo=FALSE}
+Desc_stat(33,48)
+```
+Statystyki opisowe - Holownia
+```{r echo=FALSE}
+Desc_stat(49,64)
+```
+Statystyki opisowe - Biedron
+```{r echo=FALSE}
+Desc_stat(65,80)
+```
+Statystyki opisowe - Bosak
+```{r echo=FALSE}
+Desc_stat(81,96)
+```
+Statystyki opisowe - Gowin
+```{r echo=FALSE}
+Desc_stat(97,112)
+```
+Statystyki opisowe - Morawiecki
+```{r echo=FALSE}
+Desc_stat(113,128)
+```
+Statystyki opisowe - Idealny
+```{r echo=FALSE}
+Desc_stat(129,144)
+```
+Wykresy pudełkowe wedlug grup:
+```{r}
+#Funkcja do 'plotowania' wykresów
+plothists = function(data){
+
+plot_ly(data,
+        y = ~Pyt_2_1,
+        type = "box",
+        fillcolor = list(color = '#ff0000'),
+        line = list(color = '#ab1111'),
+        outliercolor = '#ab1111',
+        name = "Polscy politycy dotrzymują obietnic wyborczych") %>%
+  add_boxplot(y = ~Pyt_2_2,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy są skorumpowani") %>%
+  add_boxplot(y =  ~Pyt_2_3,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy myślą od wyborów do wyborów") %>%
+  add_boxplot(y = ~Pyt_2_4,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy potrafią ze sobą współpracować") %>%
+  add_boxplot(y = ~Pyt_2_5,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy podejmują działania na rzecz klimatu i ochrony środowiska") %>%
+  add_boxplot(y = ~Pyt_2_6,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy respektują prawo unijne i międzynarodowe") %>%
+  add_boxplot(y = ~Pyt_2_7,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy są poważani na arenie międzynarodowej") %>%
+  add_boxplot(y = ~Pyt_2_8,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polscy politycy skutecznie walczą z pandemią") %>%
+  add_boxplot(y = ~Pyt_2_9,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "W dobie pandemii Polscy politycy wspierają przedsiębiorców") %>%
+  add_boxplot(y = ~Pyt_2_10,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Immunitet polskich polityków na terenie Polski powinien zostać zniesiony") %>%
+  add_boxplot(y = ~Pyt_2_11,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Pensja polskich polityków jest odpowiednia") %>%
+  add_boxplot(y = ~Pyt_2_12,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Działania polskich polityków coraz bardziej dzielą społeczeństwo") %>%
+  add_boxplot(y = ~Pyt_2_13,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Służba zdrowia jest wspierana przez polskich polityków") %>%
+  add_boxplot(y = ~Pyt_2_14,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Na polskiej scenie politycznej panuje nepotyzm") %>%
+  add_boxplot(y = ~Pyt_2_15,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Kobiety mają mniejsze szanse w polskiej polityce niż mężczyźni") %>%
+  add_boxplot(y = ~Pyt_2_16,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polacy są tolerancyjni wobec innych narodowości") %>%
+  add_boxplot(y = ~Pyt_2_17,
+              fillcolor = list(color = '#ff0000'),
+              line = list(color = '#ab1111'),
+              outliercolor = '#ab1111',
+              name = "Polacy cechują się wysoką świadomością polityczną") %>%layout(showlegend = FALSE)
+}
+```
+```{r message=FALSE, warning=FALSE}
+print("Ogólem")
+plothists(df[,c(145:161)])
+print("Wiek Starsi")
+plothists(df[df$Wiek > 4,c(145:161)])
+print("Wiek Sredni")
+plothists(df[df$Wiek > 1 & df$Wiek <5 ,c(145:161)])
+print("Wiek Mlodzi")
+plothists(df[df$Wiek == 1 ,c(145:161)])
+print("wyksztalcenie srednie")
+plothists(df[df$Wykształcenie < 4,c(145:161)])
+print("wyksztalcenie wyzsze")
+plothists(df[df$Wykształcenie == 4,c(145:161)])
+print("Wiek kobiety")
+plothists(df[df$Płeć == 1,c(145:161)])
+print("Wiek mezczyzni")
+plothists(df[df$Płeć == 0,c(145:161)])
+```
+Analiza Czynnikowa
+Korelacja zmiennych  - Pytania
+```{r}
+corr = round(cor(df[,c(145:161)]),2)
+corrplot::corrplot.mixed(corr)
+```
+Testy roznych bibliotek 
+```{r}
+REdaS::bart_spher(df[,c(145:161)], use = 'everything')
+REdaS::KMOS(df[,c(145:161)])
+EFAtools::BARTLETT(x = df[,c(145:161)],
+                   use = "everything",cor_method = "spearman")
+EFAtools::KMO(corr)
+psych::cortest.bartlett(df[,c(145:161)],n = 17)
+psych::KMO(corr)
+```
+Scree plot ,  kryterium wartosci wlasnej
+```{r}
+d = EFAtools::SCREE(corr, eigen_type = "PCA")
+d
+Ogolem = d$eigen_PCA
+proc_var = d$eigen_PCA/17
+knitr::kable(data.frame(Ogolem,`Procent Wariancji` = proc_var,`Procent Wariancji Skumulowany` = cumsum(proc_var)))
+
+KMO = psych::KMO(corr)
+knitr::kable(data.frame(MSA = KMO$MSAi))
+```
+Po redukcji pytan 11 i 15
+```{r}
+
+#155, 159 - pytania 11 i 15
+corr2 = cor(df[,c(145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 160, 161)])
+EFAtools::BARTLETT(x = df[,c(145, 146, 147, 148, 149, 150, 151, 152, 153, 154,155, 156, 157, 158, 160, 161)],
+                   use = "everything",cor_method = "spearman")
+EFAtools::KMO(corr2)
+d = EFAtools::SCREE(corr2, eigen_type = "PCA")
+d
+Ogolem = d$eigen_PCA
+proc_var = d$eigen_PCA/15
+knitr::kable(data.frame(Ogolem,`Procent Wariancji` = proc_var,`Procent Wariancji Skumulowany` = cumsum(proc_var)))
+
+```
+Rotacje:
+
+
+
+
+
+Analiza Korespondencji
+Tablica kontyngencji dla polityków:
+```{r}
+means = c()
+for (i in 1:144){
+  means = c(means, mean(df[,i]))
+}
+Rownames_ = c()
+for (i in 1:16){
+  rowname = colnames(df[i])
+  rowname = gsub(rowname,pattern = "Trzaskowski_", replacement = "")
+  Rownames_ = c(Rownames_,rowname)
+}
+
+Tablica_kontyngencji = data.frame(split(means, ceiling(seq_along(means)/16)))
+colnames(Tablica_kontyngencji) = c('Trzaskowski',
+                                   'Kaczyński',
+                                   'Kosiniak_Kamysz',
+                                   'Hołownia',
+                                   'Biedroń',
+                                   'Bosak',
+                                   'Gowin',
+                                   'Morawiecki',
+                                   'Polityk_idealny')
+Tablica_kontyngencji = cbind(Cecha = Rownames_, Tablica_kontyngencji,stringsAsFactors = TRUE)
+rownames(Tablica_kontyngencji) <- Tablica_kontyngencji[,1]
+Tablica_kontyngencji = Tablica_kontyngencji[,-1]
+knitr::kable(Tablica_kontyngencji)
+```
+
+
+Analiza korespondencji kontynuacja
+```{r warning=FALSE}
+library(FactoMineR)
+library(factoextra)
+library(ca)
+
+res.ca = ca(Tablica_kontyngencji, graph = FALSE,ncp = 2)
+res.ca3 = CA(X = Tablica_kontyngencji, graph = F,ncp = 3)
+eig = res.ca3$eig
+print("Tablice dla analizy korespondencji")
+summary(res.ca)
+
+
+ggplot(data = as.data.frame(eig), aes(x = c(1:8),y = as.numeric(eig[,2]))) + 
+  geom_line(color = "black") + geom_point() + 
+  labs(title="Scree plot",x="Dimensions",y = "Percentage of variances") + theme_classic()
+
+fviz_ca_row(res.ca, repel = TRUE)
+fviz_ca_col(res.ca, repel = TRUE)
+plot(res.ca)
+
+#wartosci ctr i cos^2 dla trzech wymiarów
+print("Wartosci cos^2 i ctr dla trzeciego wymiaru")
+cos2row_3dim = res.ca3$row$cos2
+ctrrow_3dim = res.ca3$row$contrib*10
+print("Cos^2 dla 3 wymiarów:")
+knitr::kable(cos2row_3dim)
+print("ctr dla 3 wymiarów:")
+knitr::kable(ctrrow_3dim)
+
+#ctr i cos2 dla column w 3cim wymiarze
+print("Wartosci cos^2 i ctr dla trzeciego wymiaru")
+cos2row_3dim = res.ca3$col$cos2
+ctrrow_3dim = res.ca3$col$contrib*10
+print("Cos^2 dla 3 wymiarów:")
+knitr::kable(cos2row_3dim)
+print("ctr dla 3 wymiarów:")
+knitr::kable(ctrrow_3dim)
+
+
+#Wykres 3d
+s3d = scatterplot3d::scatterplot3d(res.ca3$col$coord[,1:3], pch = 16,type = "h", color = "blue",grid = T,box = FALSE,main = "3D Plot",xlab = "Dim 1",ylab="Dim2",zlab ="Dim3",angle = 75)
+text(s3d$xyz.convert(res.ca3$col$coord[,1:3]*1.2), labels = rownames(res.ca3$col$coord[,1:3]),
+     cex= 0.7, col = "steelblue")
+s3d$points3d(res.ca3$row$coord[,1:3], pch = 16, type = "h",col = "red")
+text(s3d$xyz.convert(res.ca3$row$coord[,1:3]*1.2), labels = rownames(res.ca3$row$coord[,1:3]),
+     cex= 0.7, col = "darkred")
+
+
+#dendrogram
+dd <- dist(scale(t(Tablica_kontyngencji)), method = "euclidean")
+hc <- hclust(dd, method = "ward.D2")
+plot(hc)
+```
+Analiza korespondencji - tablica burta - metryka
+```{r}
+library(cabootcrs)
+#wygenerowanie tablicy burta, stworzenie tablic krzyzowych
+burttable = getBurt(df[,162:164])
+rownames(burttable) = c('Mezczyzna','Kobieta','18-29','30-39','40-49','50-59','60-69','70 i więcej','Zawodowe','Średnie','Wyższe')
+colnames(burttable) = c('Mezczyzna','Kobieta','18-29','30-39','40-49','50-59','60-69','70 i więcej','Zawodowe','Średnie','Wyższe')
+knitr::kable(burttable)
+t1 = table(df$Wiek,df$Wykształcenie)
+t2 = table(df$Wiek,df$Płeć)
+t3 = table(df$Wykształcenie,df$Płeć)
+
+
+#funckja do liczenia statystyk chi kwadrat, fi kwadrat i c pearson
+n = nrow(df)
+chi_fi_cpear = function(tablica,n){
+  options(warn = -1)
+  chi_kwadrat1<<-chisq.test(tablica)
+  fi_kwadrat1<<-as.numeric(chi_kwadrat1$statistic)/n
+  c_pearson1<<-(as.numeric(chi_kwadrat1$statistic)/(as.numeric(chi_kwadrat1$statistic)+n))^0.5
+  print(paste('fi kwadrat', fi_kwadrat1))
+  print(paste('c pearson', c_pearson1))
+  print(chi_kwadrat1)
+}
+#generacja wartosci na podstawie w.w. funkcji i stowrzenie tablicy
+chi_fi_cpear(t1,n)
+chi_wiek_wyk = round(chi_kwadrat1$statistic,3)
+fi_wiek_wyk = round(fi_kwadrat1,3)
+chi_fi_cpear(t2,n)
+chi_wiek_plec = round(chi_kwadrat1$statistic,3)
+fi_wiek_plec = round(fi_kwadrat1,3)
+chi_fi_cpear(t3,n)
+chi_wyk_plec = round(chi_kwadrat1$statistic,3)
+fi_wyk_plec = round(fi_kwadrat1,3)
+Fi_chi_kwadrat_table = data.frame(Plec = c('-', fi_wiek_plec,fi_wyk_plec), 
+            Wiek = c(chi_wiek_plec, '-', fi_wiek_wyk),
+            Wyksztalcenie = c(chi_wyk_plec,chi_wiek_wyk,'-'),
+            row.names = c('Plec','Wiek','Wyksztalcenie'))
+knitr::kable(Fi_chi_kwadrat_table)
+
+
+
+#Analiza korespondencji tablicy burta
+ca.burt = ca(burttable)
+ca.burt2 = ca(burttable[c(-1,-2),c(-1,-2)])
+summary(ca.burt)
+summary(ca.burt2)
+ca::plot.ca(ca.burt)
+ca::plot.ca(ca.burt2)
+```
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
