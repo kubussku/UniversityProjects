@@ -8,7 +8,7 @@ Programme: https://wzr.ug.edu.pl/studia/index.php?str=491&spec=68&tr=2
 Current Archives state:  
 AI Methods - empty  
 Big Data - empty  
-Calculations Programming (R+Python) - empty  
+Calculations Programming (R+Python) - trapped knight sequence in r, python empty
 Data warehouses - empty  
 DataPreparation - finished  
 DataVisualisation - proj1 - basic shiny walmart dashboard  
