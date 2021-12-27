@@ -1,0 +1,193 @@
+---
+title: "Problem uwięzionego skoczka"
+author: "Jakub Kur"
+date: "20 12 2021"
+output: html_document
+---
+### Opis problemu:
+  Problem uwięzionego skoczka został przedstawiony przez Neil'a Sloane'a w ![https://oeis.org/A316667]{https://oeis.org/A316667}:
+  Ruszający się do najniższych wartościowo pól po nieskończonej szachownicy z wartościami rosnącymi według ruchu spirali rozpoczynając od środka bez możliwości ruchu na to samo pole dwukrotnie.
+  
+  Problem uwięzienia następuje w ruchu 2016, kiedy skoczek nie ma dostępnego legalnego ruchu.
+  
+  
+  
+  
+#### Stworzenie szachownicy z wartościami określonymi na spirali:
+  
+  Szachownica jest tworzona na zasadzie ruchów od środka:
+  Co jeden ruch dodawana jest kolena wartość. 
+  Ilość możliwych ruchów rozpoczyna się od jednego. Po dwukrotnej zmianie kierunku zwiększana jest o 1.
+  Maksymalna ilość ruchów określona jest ilością pól w macierzy
+
+
+```{r}
+# Funckja tworząca podstawową spirale, nie przyjmuje wartości parzystych.
+StartMatrix = function(cellRange){
+  if((cellRange %% 2) == 0){
+    print("cellRange must be UNEVEN integer.")
+  }
+  else{
+    return(matrix(1,cellRange,cellRange))      
+  }
+
+}
+Matrix = StartMatrix(101)  # Stworzenie dostatecznie dużej macierzy
+
+# Określenie pola startowego
+Column_Position = round(ncol(Matrix)/2)
+Row_Position = round(nrow(Matrix)/2)
+# Parametry początkowe , wartośc pola, kierunek, krok, Licznik zmian kierunku
+Number = 1
+Direction = factor('Right', levels = c('Right', 'Up','Left','Down'))
+step = 0
+Side_counter = 0
+stepLeft = 1
+
+
+# Sekwencja
+for (i in c(1:(nrow(Matrix)*ncol(Matrix)))){
+  Matrix[Row_Position,Column_Position] = Number
+  # Zmiana pozycji ruchu skoczka
+  if(Direction == 'Right'){
+    Column_Position<<-Column_Position+1
+    Row_Position<<-Row_Position
+  }
+  if(Direction == 'Up'){
+    Column_Position<<-Column_Position
+    Row_Position<<-Row_Position-1
+  }
+  if(Direction == 'Left'){
+    Column_Position<<-Column_Position-1
+    Row_Position<<-Row_Position
+  }
+  if(Direction == 'Down'){
+    Column_Position <<- Column_Position
+    Row_Position <<- Row_Position+1
+  }
+  # Jezeli liczba kroków dojdzie do limitu, Zmieni się kierunek , kroki liczone sa ponownie od 0, zwiekszany jest licznik zmian kierunków
+  step = step + 1
+  if (step == stepLeft){
+    Side_counter <<- Side_counter + 1
+    step = 0
+    if(Direction == 'Right'){
+      Direction = "Up"
+    }else if(Direction == 'Up'){
+      Direction = "Left"
+    }else if(Direction == 'Left'){
+      Direction = "Down"
+    }else if(Direction == 'Down'){
+      Direction = "Right"
+    }
+  }
+  # Po każdych dwóch zmianach kiernków zamieniany zwiększa się liczba kroków
+  if (Side_counter == 2){
+    Side_counter<<-0 
+    stepLeft<<-stepLeft +1
+  }
+  # Zwiększenie wartości pola
+  Number <<- Number + 1
+}
+
+Matrix_sample = StartMatrix(5)
+Matrix_sample
+```
+
+
+#### Sekwencja ruchów skoczka:
+```{r}
+# Kopia robocza Macierzy
+mat = Matrix                                                                
+# Wyznaczenie Pola startowego
+Column_Position = round(nrow(mat)/2)                                            
+Row_Position = round(ncol(mat)/2)                                            
+Time = 1                     # Licznik czasu                                             
+# Ramka danych dla zbierania wyników ruchów
+Results = data.frame(Column_Position,Row_Position,Time, Value = mat[Column_Position,Row_Position])   
+
+
+# Start sekwencji
+while(Time < 2016){
+  # Wygenerowanie możliwych ruchów
+  Possible_Moves_func = function(){
+    data.frame(
+      Position_Names = c('Top_left',      
+                         'Top_right',     
+                         'Left_top',      
+                         'Left_bottom',   
+                         'Right_top',     
+                         'Right_bottom',  
+                         'Bottom_left',   
+                         'Bottom_right'),
+      Column_Positions = c((Column_Position - 1) ,
+                           (Column_Position + 1) ,
+                           (Column_Position - 2) ,
+                           (Column_Position - 2) ,
+                           (Column_Position + 2) ,
+                           (Column_Position + 2) ,
+                           (Column_Position - 1) ,
+                           (Column_Position + 1)),
+      Row_Positions = c((Row_Position - 2),
+                        (Row_Position - 2),
+                        (Row_Position - 1),
+                        (Row_Position + 1),
+                        (Row_Position - 1),
+                        (Row_Position + 1),
+                        (Row_Position + 2),
+                        (Row_Position + 2))
+    )
+  }
+  Possible_Moves = Possible_Moves_func()
+  # Wyrzucenie ruchów które wykraczają po za macierz
+  Possible_Moves = Possible_Moves[Possible_Moves$Row_Positions %in% c(1:nrow(Matrix)) &Possible_Moves$Column_Positions %in% c(1:ncol(Matrix)),]
+  # Wyznaczenie wartości dla możliwych ruchów
+  Values = c()
+  for(i in 1:nrow(Possible_Moves)){
+    Values = append(Values,mat[Possible_Moves$Row_Positions[i],Possible_Moves$Column_Positions[i]])
+  }
+  Possible_Moves = cbind(Possible_Moves, Values)
+  # Wyrzucanie pustych wartości na macierzy (pola które już zostały odwiedzone)
+  Possible_Moves = na.omit(Possible_Moves)
+  # Wybór najlepszego ruchu
+  Best_Move = Possible_Moves[Possible_Moves$Values == min(Possible_Moves$Values),]
+  # ustawienie wartosci NA w miejscu na który został wykonany ruch
+  mat[Row_Position,Column_Position] = NA
+  # Ustawienie nowej pozycji
+  Column_Position = Best_Move$Column_Positions
+  Row_Position =  Best_Move$Row_Positions
+  Time = Time + 1
+  # Dopisanie wartości do rezultatu
+  Results = rbind(Results,
+                  data.frame(Column_Position = Best_Move$Column_Positions,
+                             Row_Position = Best_Move$Row_Positions,
+                             Time,
+                             Value = Best_Move$Value))
+}
+# Początkowe ruchy
+head(Results)
+```
+
+
+#### Wizualizacja wyników:
+
+```{r}
+library(ggplot2)
+ggplot(Results, aes(Column_Position, Row_Position, color = Time)) +
+  geom_path() + theme_minimal() + scale_color_gradient2(mid = 'orange', low="yellow",high = "red") + 
+  geom_point(aes(Column_Position[1],Row_Position[1])) + 
+  geom_point(aes(Column_Position[2016],Row_Position[2016]))
+# Animacyjnie kroki
+#ggplot(Results, aes(Column_Position, Row_Position, color = Time)) +
+#  geom_path() + theme_minimal() + scale_color_gradient2(mid = 'orange', low="yellow",high = "red") + 
+#  geom_point(aes(Column_Position[1],Row_Position[1])) + 
+#  geom_point(aes(Column_Position[2016],Row_Position[2016])) + gganimate::transition_reveal(Time)
+```
+
+
+
+
+
+
+
+
+
